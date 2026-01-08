@@ -43,8 +43,10 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
       if(activeTab === 'issuer') {
           loadServerLicenses();
       }
-      setVendorWhatsApp(settingsService.getVendorWhatsApp());
-  }, [activeTab]);
+      if(isAuthenticated) {
+          setVendorWhatsApp(settingsService.getVendorWhatsApp());
+      }
+  }, [activeTab, isAuthenticated]);
 
   const loadServerLicenses = async () => {
       const licenses = await cloudService.adminGetIssuedLicenses();
@@ -72,11 +74,9 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
 
       try {
           await dbService.logAction('SYSTEM_RESET', `Re-inicialización manual: Rubro ${template.name}`, 'critical');
-          
           const currentProducts = dbService.getProducts();
           for (const p of currentProducts) await dbService.deleteProduct(p.id);
           for (const p of template.products) await dbService.addProduct(p);
-          
           settingsService.saveLoyaltySettings(template.loyalty);
           soundService.playSound('success');
           setFeedback({ type: 'success', msg: `Plantilla "${template.name}" aplicada.` });
@@ -89,9 +89,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
   const handleUpdateLicense = async () => {
       if (!licenseKeyInput.trim()) return;
       setFeedback({ type: 'neutral', msg: 'Validando contra Nexus...' });
-      
       const result = await cloudService.connectToNexus(licenseKeyInput.trim());
-      
       if (result.success) {
           soundService.playSound('success');
           setFeedback({ type: 'success', msg: `Licencia Activa: ${result.message}` });
@@ -106,11 +104,11 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
   const handleResetQuota = () => {
       localStorage.removeItem('dominion-ai-quota');
       soundService.playSound('hero');
-      setFeedback({ type: 'success', msg: 'Cuotas de IA reiniciadas (1 uso gratis disponible).' });
+      setFeedback({ type: 'success', msg: 'Cuotas de IA reiniciadas.' });
   };
 
   const handleNuclearReset = () => {
-      if(window.confirm("PELIGRO: Esto borrará ABSOLUTAMENTE TODO (Ventas, Productos, Clientes, Configuración). El sistema volverá al estado de fábrica. ¿Proceder?")) {
+      if(window.confirm("PELIGRO: Esto borrará ABSOLUTAMENTE TODO. El sistema volverá al estado de fábrica. ¿Proceder?")) {
           localStorage.clear();
           indexedDB.deleteDatabase('dominion-db');
           window.location.reload();
@@ -120,8 +118,9 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
   const handleSaveVendorContact = () => {
       if(!vendorWhatsApp.trim()) return;
       settingsService.saveVendorWhatsApp(vendorWhatsApp);
-      setFeedback({ type: 'success', msg: 'Contacto de ventas actualizado.' });
-      soundService.playSound('click');
+      setFeedback({ type: 'success', msg: 'Configuración Global Sincronizada en Nexus.' });
+      soundService.playSound('hero');
+      setTimeout(() => setFeedback(null), 3000);
   }
   
   const handleGenerateLicense = async () => {
@@ -247,17 +246,23 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
                                 </div>
                             </div>
 
-                            <div className="pt-6 border-t border-gray-800">
-                                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><MessageCircle size={16} className="text-purple-400"/> Vendor Config</h3>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        value={vendorWhatsApp} 
-                                        onChange={e => setVendorWhatsApp(e.target.value)} 
-                                        placeholder="WhatsApp Soporte..."
-                                        className="flex-1 bg-black border border-gray-700 rounded-xl px-4 py-3 text-xs outline-none focus:border-purple-500"
-                                    />
-                                    <button onClick={handleSaveVendorContact} className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">Set</button>
+                            <div>
+                                <h3 className="text-dp-gold font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2"><Globe size={16} className="text-dp-gold"/> Nexus Global Settings</h3>
+                                <div className="p-4 bg-black/40 border border-dp-gold/20 rounded-xl space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">WhatsApp de Venta (Global)</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                value={vendorWhatsApp} 
+                                                onChange={e => setVendorWhatsApp(e.target.value)} 
+                                                placeholder="Ej: 54911..."
+                                                className="flex-1 bg-black border border-gray-700 rounded-xl px-4 py-3 text-xs outline-none focus:border-dp-gold font-mono text-dp-gold"
+                                            />
+                                            <button onClick={handleSaveVendorContact} className="bg-dp-gold hover:bg-yellow-500 text-black px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg">Push</button>
+                                        </div>
+                                        <p className="text-[9px] text-gray-500 mt-2 italic">* Este número se actualizará para todos los nodos activos.</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -275,7 +280,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
                             <div className="flex justify-between items-start mb-6">
                                 <div>
                                     <h3 className="text-dp-gold font-black text-xs uppercase tracking-widest flex items-center gap-2"><Key size={20}/> Servidor de Emisión</h3>
-                                    <p className="text-[11px] text-gray-500 font-bold uppercase mt-1">Generación de tokens criptográficos para Dominion Nexus.</p>
+                                    <p className="text-[11px] text-gray-500 font-bold uppercase mt-1">Generación de tokens para Dominion Nexus.</p>
                                 </div>
                                 <span className="text-[9px] bg-dp-gold/10 text-dp-gold border border-dp-gold/40 px-3 py-1 rounded-full font-black uppercase tracking-widest shadow-lg shadow-dp-gold/5">Authority Level: 10</span>
                             </div>
@@ -308,7 +313,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
                                         <tr>
                                             <th className="px-6 py-3">Key (Nexus ID)</th>
                                             <th className="px-6 py-3">Plan</th>
-                                            <th className="px-6 py-3">Nodo Vinculado</th>
+                                            <th className="px-6 py-3">Nodos</th>
                                             <th className="px-6 py-3 text-right">Acciones</th>
                                         </tr>
                                     </thead>
@@ -324,7 +329,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
                                                     }`}>{license.plan.toUpperCase()}</span>
                                                 </td>
                                                 <td className="px-6 py-3 text-[10px] font-mono text-gray-500">
-                                                    {license.boundNodeIds && license.boundNodeIds.length > 0 ? license.boundNodeIds[0].substring(0,16) + '...' : 'Esperando Vinculación...'}
+                                                    {license.boundNodeIds && license.boundNodeIds.length > 0 ? `${license.boundNodeIds.length} Dispositivos` : 'Disponible'}
                                                 </td>
                                                 <td className="px-6 py-3 text-right flex justify-end gap-3">
                                                     <button onClick={() => copyToClipboard(license.key)} className="p-1.5 bg-dp-charcoal hover:bg-gray-700 rounded-lg text-gray-400 transition-all shadow-sm" title="Copiar"><Clipboard size={14}/></button>
@@ -334,9 +339,6 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
                                                 </td>
                                             </tr>
                                         ))}
-                                        {issuedLicenses.length === 0 && (
-                                            <tr><td colSpan={4} className="p-20 text-center text-gray-600 font-black uppercase text-[10px] tracking-widest">Sin datos en el servidor Nexus</td></tr>
-                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -355,18 +357,6 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, onRefresh }) =
                                 <h3 className="text-dp-gold text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2"><Activity size={14}/> Node Metrics</h3>
                                 <pre className="text-[11px] text-yellow-400 font-mono whitespace-pre-wrap bg-dp-dark p-4 rounded-xl shadow-inner border border-gray-800">{JSON.stringify(telemetryData.metrics, null, 2)}</pre>
                             </div>
-                        </div>
-                        <div className="p-6 bg-black/40 rounded-2xl border border-gray-800 flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-green-900/20 rounded-full border border-green-500/30">
-                                    <Globe size={24} className="text-green-500" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-black text-white uppercase tracking-tighter">Nexus Connectivity</p>
-                                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Heartbeat: Active // Latency: 22ms</p>
-                                </div>
-                            </div>
-                            <span className="px-4 py-1.5 bg-green-500 text-black text-[10px] font-black rounded-full shadow-lg shadow-green-500/20">ESTABLE</span>
                         </div>
                     </div>
                 )}

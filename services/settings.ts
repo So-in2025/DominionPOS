@@ -1,9 +1,9 @@
 
 import type { LoyaltySettings, BusinessSettings } from '../types';
+import * as cloudService from './cloud';
 
 const LOYALTY_SETTINGS_KEY = 'dominion-loyalty-settings';
 const BUSINESS_SETTINGS_KEY = 'dominion-business-settings';
-const VENDOR_WHATSAPP_KEY = 'dominion-vendor-wa';
 const AI_QUOTA_KEY = 'dominion-ai-quota';
 
 const LOYALTY_DEFAULTS: LoyaltySettings = {
@@ -66,7 +66,7 @@ export function saveBusinessSettings(settings: BusinessSettings) {
 // --- AI Quota Management (Monthly Free Usage) ---
 
 interface AiQuota {
-    month: string; // Format YYYY-MM
+    month: string; 
     imageCount: number;
     voiceCount: number;
 }
@@ -85,13 +85,12 @@ function getQuota(): AiQuota {
         }
     } catch(e) {}
 
-    // Reset or New
     return { month: currentMonth, imageCount: 0, voiceCount: 0 };
 }
 
 export function checkFreeQuota(type: 'image' | 'voice'): boolean {
     const quota = getQuota();
-    const limit = 1; // 1 free use per month per type
+    const limit = 1; 
     if (type === 'image') return quota.imageCount < limit;
     if (type === 'voice') return quota.voiceCount < limit;
     return false;
@@ -104,12 +103,14 @@ export function incrementFreeQuota(type: 'image' | 'voice') {
     localStorage.setItem(AI_QUOTA_KEY, JSON.stringify(quota));
 }
 
-// --- Vendor Configuration (Dynamic WhatsApp) ---
+// --- Vendor Configuration (Nexus Sync) ---
 
 export function getVendorWhatsApp(): string {
-    return localStorage.getItem(VENDOR_WHATSAPP_KEY) || '5491100000000';
+    // Ahora obtenemos el número directamente del Nexus (Registro Global)
+    return cloudService.getGlobalNexusConfig().vendorWhatsApp;
 }
 
 export function saveVendorWhatsApp(number: string) {
-    localStorage.setItem(VENDOR_WHATSAPP_KEY, number.replace(/[^0-9]/g, ''));
+    // Ahora guardamos en el Nexus (Registro Global)
+    cloudService.saveGlobalNexusConfig({ vendorWhatsApp: number.replace(/[^0-9]/g, '') });
 }
