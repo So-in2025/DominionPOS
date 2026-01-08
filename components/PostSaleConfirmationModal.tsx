@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Transaction } from '../types';
 import { CheckCircle, Printer, X, ShoppingBag } from 'lucide-react';
@@ -12,7 +11,7 @@ interface PostSaleConfirmationModalProps {
 const PostSaleConfirmationModal: React.FC<PostSaleConfirmationModalProps> = ({ transaction, onClose, onPrintReceipt }) => {
   return (
     <div 
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
     >

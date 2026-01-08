@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { AuditLogEntry } from '../types';
 import * as dbService from '../services/db';
@@ -35,7 +34,7 @@ const AuditLogModal: React.FC<AuditLogModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center" aria-modal="true" role="dialog" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center" aria-modal="true" role="dialog" onClick={onClose}>
       <div className="bg-dp-light dark:bg-dp-charcoal rounded-lg shadow-2xl p-6 w-full max-w-4xl m-4 flex flex-col max-h-[85vh] animate-modal-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-dp-dark-gray dark:text-dp-light-gray flex items-center gap-2">

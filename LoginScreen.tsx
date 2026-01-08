@@ -6,7 +6,7 @@ import * as settingsService from '../services/settings';
 import * as soundService from '../services/sound';
 import * as cloudService from '../services/cloud';
 import { BUSINESS_TEMPLATES } from '../services/templates';
-import { LockKeyhole, Delete, ShieldCheck, PlayCircle, Store, Crown, User as UserIcon, Plus, LayoutGrid, Briefcase, MessageCircle, X, CheckCircle, Loader2, HardDrive } from 'lucide-react';
+import { LockKeyhole, Delete, ShieldCheck, PlayCircle, Store, Crown, User as UserIcon, Plus, LayoutGrid, Briefcase, MessageCircle, X, CheckCircle, Loader2 } from 'lucide-react';
 import DeveloperPanel from './DeveloperPanel';
 
 interface LoginScreenProps {
@@ -52,6 +52,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             setSettings(settingsService.getBusinessSettings());
         };
         load();
+        
+        // Auto-generate free key on mount for default selection
+        if (!validatedLicenseKey) {
+             setValidatedLicenseKey(`FREE-${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
+        }
     }, []);
     
     // Reset sequence if inactive for 5 seconds
@@ -72,11 +77,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     // --- LICENSE VERIFICATION LOGIC ---
     const handlePlanClick = (plan: PlanTier) => {
-        // Ahora TODOS los planes requieren verificación, incluso el Base (starter)
-        setVerifyingPlan(plan);
-        setLicenseInput('');
-        setVerificationStatus({ loading: false, error: '', success: false });
-        soundService.playSound('pop');
+        if (plan === 'starter') {
+            setSelectedPlan('starter');
+            setValidatedLicenseKey(`FREE-${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
+            soundService.playSound('click');
+        } else {
+            // Open Modal for Pro/Enterprise
+            setVerifyingPlan(plan);
+            setLicenseInput('');
+            setVerificationStatus({ loading: false, error: '', success: false });
+            soundService.playSound('pop');
+        }
     };
 
     const handleVerifyLicense = async () => {
@@ -91,9 +102,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         // Simulate network check using existing service
         const result = await cloudService.connectToNexus(licenseInput);
         
-        if (result.success) {
-            // Verificar si el plan devuelto coincide con la intención (opcional, pero recomendado)
-            // Por ahora asumimos que la clave dicta el plan
+        if (result.success && !result.message.includes("Gratuita")) {
             setVerificationStatus({ loading: false, error: '', success: true });
             soundService.playSound('success');
             
@@ -104,15 +113,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 setVerifyingPlan(null);
             }, 1000);
         } else {
-            setVerificationStatus({ loading: false, error: 'Licencia inválida o no encontrada.', success: false });
+            setVerificationStatus({ loading: false, error: 'Licencia inválida o expirada.', success: false });
             soundService.playSound('error');
         }
     };
 
     const getWhatsAppLink = () => {
         const vendorNumber = settingsService.getVendorWhatsApp();
-        const planName = verifyingPlan === 'starter' ? 'BASE' : verifyingPlan === 'enterprise' ? 'EMPRESA' : 'PRO';
-        const text = `Hola, necesito un código de activación para el PLAN ${planName} de DOMINION POS.`;
+        const text = `Hola, me interesa adquirir una licencia ${verifyingPlan?.toUpperCase()} para DOMINION POS.`;
         return `https://wa.me/${vendorNumber}?text=${encodeURIComponent(text)}`;
     };
 
@@ -127,11 +135,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
         if(!selectedIndustry) {
             setError("Seleccione un rubro.");
-            soundService.playSound('error');
-            return;
-        }
-        if(!validatedLicenseKey) {
-            setError("Debe activar una licencia válida.");
             soundService.playSound('error');
             return;
         }
@@ -165,7 +168,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 role: 'admin'
             });
 
-            // 4. Crear Usuario CAJA (Solo si es Pro o Empresa)
+            // 4. Crear Usuario CAJA (Solo si es Pro o Comercio)
             if (selectedPlan === 'pro' || selectedPlan === 'enterprise') {
                 await dbService.addUser({
                     name: 'Caja 1',
@@ -305,7 +308,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     // --- SETUP MODE (First Run) ---
     if (users.length === 0) {
-        const isVerifyingBase = verifyingPlan === 'starter';
         return (
             <div className="dark font-sans relative">
                 {isDevPanelOpen && <DeveloperPanel onClose={() => setIsDevPanelOpen(false)} onRefresh={handleRefreshData} />}
@@ -313,15 +315,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 {/* --- LICENSE VERIFICATION MODAL --- */}
                 {verifyingPlan && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-modal-in backdrop-blur-sm">
-                        <div className={`bg-gray-900 border ${isVerifyingBase ? 'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.2)]' : 'border-dp-gold shadow-[0_0_50px_rgba(212,175,55,0.2)]'} rounded-xl w-full max-w-sm p-6 relative`}>
+                        <div className="bg-gray-900 border border-dp-gold rounded-xl w-full max-w-sm p-6 relative shadow-[0_0_50px_rgba(212,175,55,0.2)]">
                             <button onClick={() => setVerifyingPlan(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
                                 <X size={20} />
                             </button>
-                            <h3 className={`text-xl font-bold mb-1 flex items-center gap-2 ${isVerifyingBase ? 'text-green-500' : 'text-dp-gold'}`}>
-                                {isVerifyingBase ? <HardDrive size={20}/> : <Crown size={20}/>} 
-                                Activación {verifyingPlan === 'starter' ? 'BASE' : verifyingPlan === 'enterprise' ? 'EMPRESA' : 'PRO'}
+                            <h3 className="text-xl font-bold text-dp-gold mb-1 flex items-center gap-2">
+                                <Crown size={20}/> Activación {verifyingPlan.toUpperCase()}
                             </h3>
-                            <p className="text-sm text-gray-400 mb-6">Ingrese su código de acceso único.</p>
+                            <p className="text-sm text-gray-400 mb-6">Ingrese su clave de licencia para desbloquear este plan.</p>
                             
                             <div className="space-y-4">
                                 <div>
@@ -346,10 +347,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                     className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${
                                         verificationStatus.success 
                                         ? 'bg-green-600 text-white' 
-                                        : isVerifyingBase ? 'bg-green-700 hover:bg-green-600 text-white' : 'bg-dp-gold hover:bg-yellow-500 text-black'
+                                        : 'bg-dp-gold hover:bg-yellow-500 text-black'
                                     }`}
                                 >
-                                    {verificationStatus.loading ? <Loader2 className="animate-spin"/> : verificationStatus.success ? 'Validado' : 'Verificar Código'}
+                                    {verificationStatus.loading ? <Loader2 className="animate-spin"/> : verificationStatus.success ? 'Validado' : 'Verificar Licencia'}
                                 </button>
 
                                 <div className="relative flex py-2 items-center">
@@ -365,7 +366,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                     className="block w-full py-3 rounded-lg font-bold text-center bg-[#25D366] hover:bg-[#20bd5a] text-white transition-all hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 text-sm"
                                 >
                                     <MessageCircle size={18} fill="white" />
-                                    Solicitar Código (WhatsApp)
+                                    Adquirir Licencia (WhatsApp)
                                 </a>
                             </div>
                         </div>
@@ -415,16 +416,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500 flex items-center gap-2"><Briefcase size={14}/> Tipo de Licencia</label>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handlePlanClick('starter')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'starter' ? 'bg-green-800 border-green-600 text-white ring-2 ring-green-500' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
-                                        BASE<br/><span className="text-[9px] opacity-70 font-normal">1 Usuario</span>
-                                        {selectedPlan !== 'starter' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
-                                    </button>
+                                    <button onClick={() => handlePlanClick('starter')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all ${selectedPlan === 'starter' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>GRATUITO<br/><span className="text-[9px] opacity-70 font-normal">1 Usuario</span></button>
                                     <button onClick={() => handlePlanClick('pro')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'pro' ? 'bg-purple-600 border-purple-500 text-white ring-2 ring-purple-400' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
                                         PRO<br/><span className="text-[9px] opacity-70 font-normal">2 Usuarios</span>
                                         {selectedPlan !== 'pro' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
                                     </button>
                                     <button onClick={() => handlePlanClick('enterprise')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'enterprise' ? 'bg-yellow-600 border-yellow-500 text-white ring-2 ring-yellow-400' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
-                                        EMPRESA<br/><span className="text-[9px] opacity-70 font-normal">Multi-Caja</span>
+                                        COMERCIO<br/><span className="text-[9px] opacity-70 font-normal">Multi-Caja</span>
                                         {selectedPlan !== 'enterprise' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
                                     </button>
                                 </div>
@@ -434,11 +432,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                             
                             <button 
                                 onClick={handleInitializeSystem}
-                                disabled={isSubmitting || !validatedLicenseKey}
-                                className="w-full py-4 bg-gradient-to-r from-dp-gold to-yellow-600 hover:to-yellow-500 text-black font-bold rounded-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] shadow-lg mt-2 disabled:opacity-50 disabled:grayscale"
+                                disabled={isSubmitting}
+                                className="w-full py-4 bg-gradient-to-r from-dp-gold to-yellow-600 hover:to-yellow-500 text-black font-bold rounded-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] shadow-lg mt-2 disabled:opacity-50"
                             >
                                 <PlayCircle size={20} />
-                                {validatedLicenseKey ? 'Iniciar Sistema' : 'Requiere Licencia'}
+                                Iniciar Sistema
                             </button>
                         </div>
                     </div>

@@ -26,11 +26,11 @@ const SalesHistoryModal: React.FC<SalesHistoryModalProps> = ({ onClose, onReturn
   );
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-dp-dark rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-modal-in flex flex-col max-h-[90vh] border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 z-[60] flex justify-center items-end sm:items-center backdrop-blur-sm p-4 sm:p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-dp-dark rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col animate-modal-in border border-gray-200 dark:border-gray-800 h-[100dvh] sm:h-auto sm:max-h-[90vh]" onClick={e => e.stopPropagation()}>
         
         {/* Header Section */}
-        <div className="p-6 bg-dp-soft-gray dark:bg-black/40 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start">
+        <div className="p-6 bg-dp-soft-gray dark:bg-black/40 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start flex-shrink-0">
             <div>
                 <h2 className="text-2xl font-black text-dp-dark-gray dark:text-dp-light-gray flex items-center gap-3">
                    <TrendingUp className="text-dp-blue dark:text-dp-gold"/> Auditoría de Ventas
@@ -41,7 +41,7 @@ const SalesHistoryModal: React.FC<SalesHistoryModalProps> = ({ onClose, onReturn
         </div>
 
         {/* Filter Bar */}
-        <div className="px-6 py-4 bg-white dark:bg-dp-dark border-b border-gray-100 dark:border-gray-800">
+        <div className="px-6 py-4 bg-white dark:bg-dp-dark border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input 
@@ -55,7 +55,7 @@ const SalesHistoryModal: React.FC<SalesHistoryModalProps> = ({ onClose, onReturn
         </div>
         
         {/* List Section */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar bg-white dark:bg-dp-dark">
           {filteredTxs.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center opacity-30 grayscale">
                 <Search size={48} className="mb-2"/>
@@ -127,6 +127,11 @@ const SalesHistoryModal: React.FC<SalesHistoryModalProps> = ({ onClose, onReturn
                 </div>
             ))
           )}
+        </div>
+        
+        {/* Mobile Close Button */}
+        <div className="p-4 bg-gray-50 dark:bg-black/40 border-t border-gray-100 dark:border-gray-800 sm:hidden">
+            <button onClick={onClose} className="w-full py-3 bg-gray-200 dark:bg-gray-800 rounded-xl font-bold text-xs uppercase text-gray-600 dark:text-gray-300">Cerrar Historial</button>
         </div>
       </div>
     </div>

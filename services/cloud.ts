@@ -47,9 +47,7 @@ async function _server_activateLicense(licenseKey: string, nodeId: string): Prom
             const license = db.find(l => l.key === licenseKey);
 
             if (!license) {
-                if (licenseKey.startsWith("FREE-")) {
-                    return resolve({ success: true, plan: 'starter', message: "Licencia Prepago (Local)." });
-                }
+                // Strict mode enabled: No implicit free keys anymore.
                 return resolve({ success: false, message: "Error 404: Licencia inexistente." });
             }
 
@@ -64,7 +62,7 @@ async function _server_activateLicense(licenseKey: string, nodeId: string): Prom
                     if (license.plan === 'starter') {
                         return resolve({ 
                             success: false, 
-                            message: "BLOQUEADO: El Plan Prepago es válido para 1 sola caja." 
+                            message: "BLOQUEADO: El Plan Base es válido para 1 sola caja." 
                         });
                     } else {
                         return resolve({ 
@@ -99,7 +97,7 @@ export async function adminGenerateLicense(plan: PlanTier): Promise<string> {
             while (!isUnique) {
                 const seg1 = Math.random().toString(36).substring(2, 6).toUpperCase();
                 const seg2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-                const prefix = plan === 'starter' ? 'PRE' : plan === 'pro' ? 'PRO' : 'ENT';
+                const prefix = plan === 'starter' ? 'BAS' : plan === 'pro' ? 'PRO' : 'ENT'; // Changed PRE to BAS
                 uniqueKey = `${prefix}-${seg1}-${seg2}`;
                 if (!db.find(r => r.key === uniqueKey)) isUnique = true;
             }
@@ -153,9 +151,10 @@ try {
     if (stored) {
         clientIdentity = JSON.parse(stored);
     } else {
+        // Initial state doesn't have a license key anymore
         clientIdentity = {
             nodeId: crypto.randomUUID(),
-            licenseKey: `FREE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            licenseKey: '',
             plan: 'starter',
             status: 'active',
             lastSync: 0
@@ -200,6 +199,10 @@ export async function connectToNexus(licenseKeyInput?: string): Promise<{ succes
     if (!navigator.onLine) return { success: false, message: "Sin conexión a internet." };
     
     const keyToSend = licenseKeyInput ? licenseKeyInput.trim() : clientIdentity.licenseKey;
+    
+    // Don't verify empty keys
+    if (!keyToSend) return { success: false, message: "Sin clave." };
+
     const response = await _server_activateLicense(keyToSend, clientIdentity.nodeId);
 
     if (response.success && response.plan) {
@@ -238,7 +241,7 @@ export function generateTelemetryPacket(): TelemetryPacket {
  * IMPLEMENTACIÓN REAL: Envío de salud del nodo al servidor (Simulado)
  */
 export async function sendTelemetry() {
-    if (!navigator.onLine || clientIdentity.plan === 'starter') return;
+    if (!navigator.onLine || clientIdentity.plan === 'starter' || !clientIdentity.licenseKey) return;
     
     const packet = generateTelemetryPacket();
     console.debug("📡 [Nexus Telemetry] Syncing node health...", packet);

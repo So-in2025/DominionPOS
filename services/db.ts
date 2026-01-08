@@ -1,4 +1,5 @@
 
+// ... (Previous Imports)
 import { openDB, IDBPDatabase } from 'idb';
 import {eachDayOfInterval, format, differenceInDays, endOfDay } from 'date-fns';
 import type { Product, SaleItem, Transaction, PurchaseOrder, PurchaseOrderItem, Customer, CustomerDetails, PromotionId, CashMovement, ShiftSummary, ParkedSale, User, AuditLogEntry, DominionInsight } from '../types';
@@ -8,6 +9,7 @@ import * as cloudService from './cloud';
 import * as firebaseService from './firebase';
 
 const DB_NAME = 'dominion-db';
+// ... (Constants DB_VERSION, STORE names)
 const DB_VERSION = 6; 
 const PRODUCT_STORE = 'products';
 const TRANSACTION_STORE = 'transactions';
@@ -34,6 +36,8 @@ let memoryUsers: User[] = [];
 
 let currentUserRef: User | null = null;
 let changeListener: (() => void) | null = null;
+
+// ... (Helper functions notifyChanges, setCurrentUserForAudit, initCloudSync, syncLocalData, rotateAuditLogs, performConsistencyCheck)
 
 export function setChangeListener(listener: () => void) {
     changeListener = listener;
@@ -172,9 +176,6 @@ export async function initDB() {
   initCloudSync();
 }
 
-/**
- * EXPORTAR TODO EL SISTEMA A JSON
- */
 export async function exportDatabase(): Promise<string> {
     const allData = {
         version: DB_VERSION,
@@ -190,9 +191,6 @@ export async function exportDatabase(): Promise<string> {
     return JSON.stringify(allData, null, 2);
 }
 
-/**
- * IMPORTAR DESDE JSON (REEMPLAZO TOTAL)
- */
 export async function importDatabase(jsonString: string): Promise<void> {
     const data = JSON.parse(jsonString);
     if (data.version !== DB_VERSION) {
@@ -205,7 +203,6 @@ export async function importDatabase(jsonString: string): Promise<void> {
         SHIFT_SUMMARY_STORE, USER_STORE
     ], 'readwrite');
 
-    // Limpiar y Recargar
     const stores = [
         { name: PRODUCT_STORE, data: data.products },
         { name: TRANSACTION_STORE, data: data.transactions },
@@ -225,7 +222,7 @@ export async function importDatabase(jsonString: string): Promise<void> {
     }
 
     await tx.done;
-    await initDB(); // Recargar memorias
+    await initDB();
     await logAction('DB_RESTORED', 'Base de datos restaurada desde backup externo', 'warning');
 }
 
@@ -294,7 +291,7 @@ export async function updateUser(updatedUser: User): Promise<User | undefined> {
     if (index === -1) return undefined;
     memoryUsers[index] = updatedUser;
     await db.put(USER_STORE, updatedUser);
-    await logAction('USER_UPDATED', `Usuario modificado: ${updatedUser.name}`, 'warning');
+    await logAction('USER_UPDATED', `Usuario modificado: ${updatedUser.name} (${updatedUser.role})`, 'warning');
     return updatedUser;
 }
 
@@ -346,6 +343,7 @@ export async function deleteProduct(productId: string): Promise<void> {
   if(isPro()) firebaseService.deleteFromCloud('products', productId);
 }
 
+// ... (Remainder of file functions: addTransaction, addRefundTransaction, addCashMovement, etc. - kept intact)
 export async function addTransaction(
   saleItems: SaleItem[],
   total: number,

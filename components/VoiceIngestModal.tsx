@@ -4,6 +4,8 @@ import { X, Mic, Square, Loader2, Save, RefreshCw, CheckCircle, Info, TrendingUp
 import * as aiService from '../services/ai';
 import * as dbService from '../services/db';
 import * as soundService from '../services/sound';
+import * as settingsService from '../services/settings';
+import * as cloudService from '../services/cloud';
 import * as ttsService from '../services/tts';
 import type { Product, PriceHistoryEntry } from '../types';
 
@@ -165,6 +167,12 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
   };
 
   const handleSave = async () => {
+      // --- CONSUME QUOTA HERE ON SUCCESSFUL SAVE ---
+      const isPro = cloudService.hasAccess('voice_ingest');
+      if (!isPro) {
+          settingsService.incrementFreeQuota('voice');
+      }
+
       for (const item of processedItems) {
           const priceHistoryEntry: PriceHistoryEntry = {
               date: Date.now(),
@@ -199,7 +207,7 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/80 z-[60] flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
       <div className="bg-white dark:bg-dp-charcoal rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden animate-modal-in border border-dp-blue/30 dark:border-dp-gold/30" onClick={e => e.stopPropagation()}>
         
         <div className="bg-dp-soft-gray dark:bg-black/40 p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">

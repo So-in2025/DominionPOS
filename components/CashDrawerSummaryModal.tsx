@@ -111,11 +111,11 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-white sm:bg-black/60 z-[60] flex justify-center items-end sm:items-center"
       aria-modal="true" role="dialog" onClick={onClose}
     >
       <div 
-        className="bg-dp-light dark:bg-dp-charcoal rounded-lg shadow-2xl p-6 w-full max-w-4xl m-4 flex flex-col max-h-[90vh] animate-modal-in" 
+        className="bg-dp-light dark:bg-dp-charcoal w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:rounded-lg sm:shadow-2xl p-6 sm:max-w-4xl sm:m-4 flex flex-col animate-modal-in overflow-hidden" 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4 flex-shrink-0">
@@ -131,7 +131,7 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
             <p className="text-center text-gray-500 dark:text-gray-400 mt-10">No hay operaciones registradas para el turno actual.</p>
           </div>
         ) : (
-          <div className="flex flex-col md:flex-row gap-6 flex-grow overflow-hidden">
+          <div className="flex flex-col md:flex-row gap-6 flex-grow overflow-y-auto">
             {/* Left Panel: Summary */}
             <div className="md:w-1/3 flex flex-col gap-4">
                 <SummaryCard title="Ventas Totales" value={`$${summary.totalSales.toLocaleString()}`} icon={<Hash />} />
@@ -153,7 +153,7 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
             {/* Right Panel: Physical Count */}
             <div className="md:w-2/3 flex flex-col border-t-2 md:border-t-0 md:border-l-2 pt-4 md:pt-0 md:pl-6 border-dashed border-gray-300 dark:border-gray-700">
               <h3 className="text-lg font-semibold mb-2">Conteo de Billetes</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 gap-3 overflow-y-auto pr-2 pb-2">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 gap-3 overflow-y-auto pr-2 pb-2 max-h-[300px] md:max-h-full">
                 {denominations.map(den => (
                   <div key={den.value} className="flex items-center justify-between bg-dp-soft-gray dark:bg-black/30 p-2 rounded-lg">
                     <label className="text-sm font-bold w-16">{den.label}</label>
@@ -167,7 +167,7 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
                 ))}
               </div>
                <textarea value={notes} onChange={e => setNotes(e.target.value)}
-                         className="w-full mt-3 p-2 rounded-md border bg-dp-light dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-dp-blue dark:focus:ring-dp-gold focus:outline-none text-sm"
+                         className="w-full mt-3 p-2 rounded-md border bg-dp-light dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-dp-blue dark:focus:ring-dp-gold focus:outline-none text-sm flex-shrink-0"
                          placeholder="Observaciones del arqueo..." rows={2}></textarea>
               <div className="mt-auto pt-4 space-y-2">
                  <div className="flex justify-between items-center text-lg font-bold">

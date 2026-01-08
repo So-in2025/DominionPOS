@@ -1,5 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
+import * as cloudService from './cloud';
+import * as settingsService from './settings';
 
 export interface ScannedItem {
   productName: string;
@@ -10,9 +12,24 @@ export interface ScannedItem {
 }
 
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
+  const plan = cloudService.getPlan();
+  let apiKey: string | undefined;
+
+  if (plan === 'starter') {
+      // Free Plan uses the system API Key (Env Var)
+      apiKey = process.env.API_KEY;
+  } else {
+      // Pro/Enterprise uses BYOK from settings
+      const settings = settingsService.getBusinessSettings();
+      apiKey = settings.googleApiKey;
+  }
+
   if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
-    throw new Error("Fragilidad Crítica: API_KEY no configurada. Funciones de IA deshabilitadas en este entorno.");
+    if (plan === 'starter') {
+        throw new Error("Fragilidad Crítica: API_KEY del sistema no configurada. Contacte soporte.");
+    } else {
+        throw new Error("BYOK Requerido: Configure su API Key de Google Gemini en el Panel de Control > Configuración.");
+    }
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -59,9 +76,9 @@ export async function analyzeInvoiceImage(base64Image: string): Promise<ScannedI
   } catch (error: any) {
     console.error("AI Service Error:", error);
     if (error.message.includes("API_KEY")) {
-        throw new Error("API_KEY no válida. Seleccione una clave activa en la configuración de IA.");
+        throw new Error("API_KEY no válida. Verifique su configuración.");
     }
-    throw new Error(error.message || "Fallo en el servicio neuronal. Verifique su conexión.");
+    throw error;
   }
 }
 

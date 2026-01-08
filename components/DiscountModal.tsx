@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 
 type Discount = { type: 'percentage' | 'fixed'; value: number };
@@ -45,7 +44,7 @@ const DiscountModal: React.FC<DiscountModalProps> = ({ onClose, onSave, currentD
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

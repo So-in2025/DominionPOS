@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Customer } from '../types';
 import { X, Search, User } from 'lucide-react';
@@ -21,7 +20,7 @@ const CustomerSelectionModal: React.FC<CustomerSelectionModalProps> = ({ custome
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

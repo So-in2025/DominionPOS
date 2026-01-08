@@ -4,6 +4,7 @@ import type { LoyaltySettings, BusinessSettings } from '../types';
 const LOYALTY_SETTINGS_KEY = 'dominion-loyalty-settings';
 const BUSINESS_SETTINGS_KEY = 'dominion-business-settings';
 const VENDOR_WHATSAPP_KEY = 'dominion-vendor-wa';
+const AI_QUOTA_KEY = 'dominion-ai-quota';
 
 const LOYALTY_DEFAULTS: LoyaltySettings = {
   pointsPerDollar: 1,
@@ -17,6 +18,7 @@ const BUSINESS_DEFAULTS: BusinessSettings = {
   phone: '(123) 456-7890',
   receiptFooter: '¡Gracias por su compra!',
   logoUrl: undefined,
+  customCategories: []
 };
 
 export function getLoyaltySettings(): LoyaltySettings {
@@ -61,7 +63,46 @@ export function saveBusinessSettings(settings: BusinessSettings) {
   }
 }
 
-/* Removed Gemini API Key storage functions as per coding guidelines */
+// --- AI Quota Management (Monthly Free Usage) ---
+
+interface AiQuota {
+    month: string; // Format YYYY-MM
+    imageCount: number;
+    voiceCount: number;
+}
+
+function getQuota(): AiQuota {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    
+    try {
+        const stored = localStorage.getItem(AI_QUOTA_KEY);
+        if (stored) {
+            const parsed: AiQuota = JSON.parse(stored);
+            if (parsed.month === currentMonth) {
+                return parsed;
+            }
+        }
+    } catch(e) {}
+
+    // Reset or New
+    return { month: currentMonth, imageCount: 0, voiceCount: 0 };
+}
+
+export function checkFreeQuota(type: 'image' | 'voice'): boolean {
+    const quota = getQuota();
+    const limit = 1; // 1 free use per month per type
+    if (type === 'image') return quota.imageCount < limit;
+    if (type === 'voice') return quota.voiceCount < limit;
+    return false;
+}
+
+export function incrementFreeQuota(type: 'image' | 'voice') {
+    const quota = getQuota();
+    if (type === 'image') quota.imageCount++;
+    if (type === 'voice') quota.voiceCount++;
+    localStorage.setItem(AI_QUOTA_KEY, JSON.stringify(quota));
+}
 
 // --- Vendor Configuration (Dynamic WhatsApp) ---
 

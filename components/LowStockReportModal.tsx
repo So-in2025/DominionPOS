@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Product } from '../types';
 import * as dbService from '../services/db';
@@ -28,7 +27,7 @@ const LowStockReportModal: React.FC<LowStockReportModalProps> = ({ onClose, onGe
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

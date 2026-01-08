@@ -3,12 +3,14 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement } from 'chart.js';
 import * as dbService from '../services/db';
+import * as cloudService from '../services/cloud';
 import { useTheme } from '../hooks/useTheme';
 // Fix: Removed startOfToday and subDays from date-fns import list as they are reported as missing exports in this environment.
 import { endOfToday } from 'date-fns';
-import { DollarSign, Hash, BarChart3, Star, Info, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ArrowRight } from 'lucide-react';
+import { DollarSign, Hash, BarChart3, Star, Info, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ArrowRight, Lock } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
 import LowStockReportModal from './LowStockReportModal';
+import UpgradeModal from './UpgradeModal';
 import type { Product, DominionInsight } from '../types';
 
 Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement);
@@ -82,6 +84,28 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, compareValue, icon, f
     );
 };
 
+// "Velvet Rope" Component
+const ProChartGuard: React.FC<{ children: React.ReactNode, title: string, onUpgrade: () => void }> = ({ children, title, onUpgrade }) => {
+    const hasAccess = cloudService.hasAccess('advanced_reports');
+    
+    if (hasAccess) return <>{children}</>;
+
+    return (
+        <div className="relative h-full w-full overflow-hidden rounded-2xl group cursor-pointer" onClick={onUpgrade}>
+            <div className="absolute inset-0 z-10 bg-white/60 dark:bg-black/60 backdrop-blur-[3px] flex flex-col items-center justify-center transition-all group-hover:backdrop-blur-[2px]">
+                <div className="bg-gradient-to-br from-yellow-400 to-orange-500 p-4 rounded-full shadow-xl mb-3 transform group-hover:scale-110 transition-transform">
+                    <Lock size={24} className="text-white" />
+                </div>
+                <h4 className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-widest mb-1">Análisis Pro</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">Desbloquea tendencias avanzadas</p>
+            </div>
+            <div className="opacity-20 pointer-events-none filter grayscale">
+                {children}
+            </div>
+        </div>
+    );
+};
+
 interface DashboardProps {
     onGeneratePO: (products: Product[]) => void;
 }
@@ -102,6 +126,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGeneratePO }) => {
     const [insights, setInsights] = useState<DominionInsight[]>([]);
     const [lowStockCount, setLowStockCount] = useState(0);
     const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
     const refreshDashboardData = useCallback(() => {
         const data = dbService.getDashboardData(dateRanges.primary, dateRanges.comparison);
@@ -169,6 +194,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGeneratePO }) => {
             </div>
 
             {isLowStockModalOpen && <LowStockReportModal onClose={() => setIsLowStockModalOpen(false)} onGeneratePO={onGeneratePO} />}
+            {isUpgradeModalOpen && <UpgradeModal onClose={() => setIsUpgradeModalOpen(false)} />}
 
             {/* DOMINION ADVISOR - IA INSIGHTS */}
             {insights.length > 0 && (
@@ -203,6 +229,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGeneratePO }) => {
                 </section>
             )}
 
+            {/* Basic Stats - Always Visible */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Ventas Totales" value={periodData.periodStats.totalSales} compareValue={comparePeriodData?.periodStats.totalSales} icon={<DollarSign />} formatAsCurrency />
                 <StatCard title="Transacciones" value={periodData.periodStats.transactionCount} compareValue={comparePeriodData?.periodStats.transactionCount} icon={<Hash />} />
@@ -210,26 +237,31 @@ const Dashboard: React.FC<DashboardProps> = ({ onGeneratePO }) => {
                 <StatCard title="Stock Bajo" value={lowStockCount} icon={<AlertTriangle />} onClick={() => setIsLowStockModalOpen(true)} variant={lowStockCount > 0 ? 'alert' : 'default'} />
             </div>
             
+            {/* Advanced Charts - Protected by "Velvet Rope" */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-dp-charcoal p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 h-80">
-                    {salesChartData && <Bar options={commonChartOptions('Tendencia de Ingresos') as any} data={salesChartData} />}
+                <div className="bg-white dark:bg-dp-charcoal p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 h-80 relative">
+                    <ProChartGuard title="Tendencia de Ingresos" onUpgrade={() => setIsUpgradeModalOpen(true)}>
+                        {salesChartData && <Bar options={commonChartOptions('Tendencia de Ingresos') as any} data={salesChartData} />}
+                    </ProChartGuard>
                 </div>
-                <div className="bg-white dark:bg-dp-charcoal p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 h-80">
-                     <Doughnut 
-                        options={{
-                            ...commonChartOptions('Distribución por Categoría'),
-                            plugins: { ...commonChartOptions('').plugins, legend: { position: 'right', labels: { color: chartTextColor, font: { size: 9, weight: 'bold' } } } }
-                        } as any} 
-                        data={{
-                            labels: periodData.categorySales.map(([name]: [string]) => name),
-                            datasets: [{
-                                data: periodData.categorySales.map(([, total]: [string, number]) => total),
-                                backgroundColor: ['#0056B3', '#D4AF37', '#10b981', '#f59e0b', '#6366f1', '#ec4899'],
-                                borderWidth: 0,
-                                hoverOffset: 10
-                            }]
-                        }} 
-                    />
+                <div className="bg-white dark:bg-dp-charcoal p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 h-80 relative">
+                    <ProChartGuard title="Distribución Categoría" onUpgrade={() => setIsUpgradeModalOpen(true)}>
+                         <Doughnut 
+                            options={{
+                                ...commonChartOptions('Distribución por Categoría'),
+                                plugins: { ...commonChartOptions('').plugins, legend: { position: 'right', labels: { color: chartTextColor, font: { size: 9, weight: 'bold' } } } }
+                            } as any} 
+                            data={{
+                                labels: periodData.categorySales.map(([name]: [string]) => name),
+                                datasets: [{
+                                    data: periodData.categorySales.map(([, total]: [string, number]) => total),
+                                    backgroundColor: ['#0056B3', '#D4AF37', '#10b981', '#f59e0b', '#6366f1', '#ec4899'],
+                                    borderWidth: 0,
+                                    hoverOffset: 10
+                                }]
+                            }} 
+                        />
+                    </ProChartGuard>
                 </div>
             </div>
             

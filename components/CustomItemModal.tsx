@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Tag } from 'lucide-react';
 
@@ -32,7 +31,7 @@ const CustomItemModal: React.FC<CustomItemModalProps> = ({ onClose, onSave }) =>
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

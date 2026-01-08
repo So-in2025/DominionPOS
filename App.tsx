@@ -44,7 +44,7 @@ import * as settingsService from './services/settings';
 import * as cloudService from './services/cloud';
 import * as soundService from './services/sound';
 import * as ttsService from './services/tts';
-import { PlusCircle, History, Search, BookCheck, Settings, Command, LayoutDashboard, List, Package, Truck, Users, DollarSign, Archive, ParkingSquare, LogOut, Crown } from 'lucide-react';
+import { PlusCircle, History, Search, BookCheck, Settings, Command, LayoutDashboard, List, Package, Truck, Users, DollarSign, Archive, ParkingSquare, LogOut, Crown, LayoutGrid, Sparkles, PauseCircle } from 'lucide-react';
 
 const App: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
@@ -66,6 +66,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'catalog' | 'dashboard' | 'inventory' | 'purchaseOrders' | 'customers'>('catalog');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(settingsService.getBusinessSettings());
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -93,7 +94,10 @@ const App: React.FC = () => {
   
   // Admin Override State
   const [isAdminOverrideOpen, setIsAdminOverrideOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{ type: 'priceOverride' | 'refund', payload: any } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ 
+      type: 'priceOverride' | 'refund' | 'itemDiscount' | 'globalDiscount', 
+      payload: any 
+  } | null>(null);
 
   // Data State
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
@@ -109,31 +113,17 @@ const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   
-  // Refs
+  // Refs for background listeners
   const barcodeBufferRef = useRef('');
   const barcodeTimerRef = useRef<number | null>(null);
 
-  // --- AUDIO AWAKEN LOGIC ---
-  useEffect(() => {
-    const awakenAudio = () => {
-        soundService.resumeAudioContext();
-        // Remove listener once audio is potentially awake
-        window.removeEventListener('click', awakenAudio);
-        window.removeEventListener('touchstart', awakenAudio);
-    };
-    window.addEventListener('click', awakenAudio);
-    window.addEventListener('touchstart', awakenAudio);
-    return () => {
-        window.removeEventListener('click', awakenAudio);
-        window.removeEventListener('touchstart', awakenAudio);
-    };
-  }, []);
-
+  // Data Fetching & Caching
   const refreshData = useCallback(() => {
     setProducts(dbService.getProducts());
     setPurchaseOrders(dbService.getPurchaseOrders());
     setCustomers(dbService.getCustomers());
     setParkedSales(dbService.getParkedSales());
+    setBusinessSettings(settingsService.getBusinessSettings());
   }, []);
 
   useEffect(() => {
@@ -157,6 +147,52 @@ const App: React.FC = () => {
     loadData();
   }, [refreshData]);
 
+  // --- Audio Context Warming Strategy ---
+  useEffect(() => {
+      const warmUpAudio = () => {
+          soundService.resumeAudioContext();
+          window.removeEventListener('click', warmUpAudio);
+          window.removeEventListener('touchstart', warmUpAudio);
+          window.removeEventListener('keydown', warmUpAudio);
+      };
+      
+      window.addEventListener('click', warmUpAudio);
+      window.addEventListener('touchstart', warmUpAudio);
+      window.addEventListener('keydown', warmUpAudio);
+      
+      return () => {
+          window.removeEventListener('click', warmUpAudio);
+          window.removeEventListener('touchstart', warmUpAudio);
+          window.removeEventListener('keydown', warmUpAudio);
+      };
+  }, []);
+
+  // --- Monthly Free Sample Notification Logic ---
+  useEffect(() => {
+      if (!isLoading && currentUser) {
+          const plan = cloudService.getPlan();
+          if (plan === 'starter') {
+              const now = new Date();
+              const currentMonthKey = `dominion-free-sample-notified-${now.getFullYear()}-${now.getMonth()}`;
+              const alreadyNotified = sessionStorage.getItem(currentMonthKey);
+              
+              if (!alreadyNotified) {
+                  const hasImageQuota = settingsService.checkFreeQuota('image');
+                  const hasVoiceQuota = settingsService.checkFreeQuota('voice');
+                  
+                  if (hasImageQuota || hasVoiceQuota) {
+                      setTimeout(() => {
+                          soundService.playSound('hero');
+                          showToast("🎁 Regalo Mensual: Tienes 1 Escaneo IA disponible.", "success");
+                          sessionStorage.setItem(currentMonthKey, 'true');
+                      }, 2000);
+                  }
+              }
+          }
+      }
+  }, [isLoading, currentUser]);
+
+  // Favorites state management
   useEffect(() => {
     try {
         const storedFavorites = localStorage.getItem('dominion-favorites');
@@ -164,6 +200,7 @@ const App: React.FC = () => {
             setFavorites(JSON.parse(storedFavorites));
         }
     } catch (error) {
+        console.error("Failed to load favorites from localStorage", error);
         setFavorites([]);
     }
   }, []);
@@ -171,7 +208,9 @@ const App: React.FC = () => {
   useEffect(() => {
       try {
           localStorage.setItem('dominion-favorites', JSON.stringify(favorites));
-      } catch (error) {}
+      } catch (error) {
+          console.error("Failed to save favorites to localStorage", error);
+      }
   }, [favorites]);
   
   useEffect(() => {
@@ -180,7 +219,13 @@ const App: React.FC = () => {
       }
   }, [currentView]);
 
-  const categories = useMemo(() => ['all', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))], [products]);
+  const categories = useMemo(() => {
+      const productCats = new Set(products.map(p => p.category).filter(Boolean));
+      const savedCats = businessSettings.customCategories || [];
+      savedCats.forEach(c => productCats.add(c));
+      return Array.from(productCats).sort();
+  }, [products, businessSettings]);
+
   const filteredProducts = useMemo(() => {
     return products.filter(product => 
       (selectedCategory === 'all' || !product.category || product.category === selectedCategory) &&
@@ -196,24 +241,19 @@ const App: React.FC = () => {
     setToast({ message, type });
   }, []);
 
-  // Handlers
+  // Handlers (Login, Logout, Favorites, Clicks... omitted for brevity if unchanged)
+  
   const handleLoginSuccess = async (user: User) => {
     setCurrentUser(user);
     dbService.setCurrentUserForAudit(user);
     await dbService.logAction('LOGIN', `Inicio de sesión exitoso`, 'info');
-    await dbService.rotateAuditLogs(); // Mantenimiento proactivo tras login
-    
-    // Despertar audio proactivamente tras interacción exitosa
-    soundService.resumeAudioContext().then(() => {
-        soundService.playSound('hero');
-        ttsService.speak(`Bienvenido, ${user.name}. Sistema listo.`, true);
-    });
+    soundService.playSound('hero'); // Hero sound
+    ttsService.speak(`Bienvenido, ${user.name}. Sistema listo.`, true);
 
     if(user.role === 'cashier'){
         setCurrentView('catalog');
     }
   };
-
   const handleLogout = async () => {
     if (currentUser) {
         await dbService.logAction('LOGOUT', `Cierre de sesión`, 'info');
@@ -244,51 +284,16 @@ const App: React.FC = () => {
 
     if (product.stock > totalQuantityInCart) {
         addItem(product);
-        soundService.playSound('beep');
+        soundService.playSound('beep'); // Beep Sound
     } else {
         soundService.playSound('error');
         showToast("Stock insuficiente para añadir más unidades.", "error");
     }
   }, [addItem, saleItems, showToast]);
+
+  // ... (Other handlers unchanged)
   
-  const executeProtectedAction = (action: { type: 'priceOverride' | 'refund', payload: any }) => {
-      if (action.type === 'priceOverride') {
-          applyPriceOverride(action.payload.itemId, action.payload.newPrice);
-          showToast("Precio modificado autorizadamente.");
-          soundService.playSound('success');
-      } else if (action.type === 'refund') {
-          setTransactionToReturn(action.payload);
-          setIsHistoryModalOpen(false);
-          setIsReturnModalOpen(true);
-      }
-  };
-
-  const handleOverrideSuccess = async (adminUser: User) => {
-      setIsAdminOverrideOpen(false);
-      if (pendingAction) {
-          await dbService.logAction('ADMIN_OVERRIDE', `Acción autorizada por ${adminUser.name}: ${pendingAction.type}`, 'warning', adminUser);
-          executeProtectedAction(pendingAction);
-          setPendingAction(null);
-      }
-  };
-
-  const requestProtectedAction = (type: 'priceOverride' | 'refund', payload: any, actionName: string) => {
-      if (currentUser?.role === 'admin') {
-          executeProtectedAction({ type, payload });
-      } else {
-          setPendingAction({ type, payload });
-          setIsAdminOverrideOpen(true);
-      }
-  };
-
-  const handleRequestPriceOverride = (itemId: string, newPrice: number | null) => {
-      requestProtectedAction('priceOverride', { itemId, newPrice }, 'Anular Precio');
-  };
-
-  const handleOpenReturnModal = (transaction: Transaction) => {
-      requestProtectedAction('refund', transaction, 'Iniciar Reembolso');
-  };
-
+  // Handlers for App Actions
   const handleParkSale = async () => {
       if (saleItems.length === 0) return;
       await dbService.addParkedSale({
@@ -299,13 +304,13 @@ const App: React.FC = () => {
       });
       clearSale();
       refreshData();
-      showToast("Venta aparcada con éxito");
+      showToast("Venta pausada con éxito");
       soundService.playSound('pop');
   };
 
   const handleRestoreSale = async (saleToRestore: ParkedSale) => {
     if (saleItems.length > 0) {
-        const confirmed = window.confirm("Hay una venta activa. ¿Desea aparcar la venta actual antes de continuar?");
+        const confirmed = window.confirm("Hay una venta activa. ¿Desea pausar la venta actual antes de continuar?");
         if (confirmed) {
             await handleParkSale();
         } else {
@@ -321,14 +326,13 @@ const App: React.FC = () => {
   };
 
   const handleDeleteParkedSale = async (saleId: string) => {
-    if (window.confirm("¿Está seguro de que desea eliminar esta venta aparcada?")) {
+    if (window.confirm("¿Está seguro de que desea eliminar esta venta pausada? Esta acción no se puede deshacer.")) {
         await dbService.deleteParkedSale(saleId);
         refreshData();
-        showToast("Venta aparcada eliminada");
+        showToast("Venta pausada eliminada");
         soundService.playSound('trash');
     }
   };
-
 
   const handleSaveNewProduct = async (productData: Omit<Product, 'id'>) => {
     await dbService.addProduct(productData);
@@ -362,7 +366,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (window.confirm('¿Está seguro de que desea eliminar este producto?')) {
+    if (window.confirm('¿Está seguro de que desea eliminar este producto? Esta acción no se puede deshacer.')) {
       await dbService.deleteProduct(productId);
       refreshData();
       showToast("Producto eliminado", "success");
@@ -412,8 +416,7 @@ const App: React.FC = () => {
     }, 500);
 
   }, [saleItems, getTotals, clearSale, refreshData, selectedCustomer, globalDiscount, activePromotion, pointsToRedeem]);
-  
-  
+
   const handleConfirmRefund = async (originalTx: Transaction, itemsToReturn: SaleItem[], refundTotal: number) => {
     await dbService.addRefundTransaction(originalTx, itemsToReturn, refundTotal);
     refreshData();
@@ -532,7 +535,7 @@ const App: React.FC = () => {
   
   const handleSettingsSaved = () => {
       setIsSettingsModalOpen(false);
-      setBusinessSettings(settingsService.getBusinessSettings());
+      refreshData(); // Updates categories etc
       showToast("Configuración guardada.");
   };
   
@@ -560,13 +563,76 @@ const App: React.FC = () => {
     setIsCommandPaletteOpen(false);
   };
 
-  // Shortcuts
+  // Protected Actions Handlers
+  const executeProtectedAction = (action: { type: 'priceOverride' | 'refund' | 'itemDiscount' | 'globalDiscount', payload: any }) => {
+      if (action.type === 'priceOverride') {
+          applyPriceOverride(action.payload.itemId, action.payload.newPrice);
+          showToast("Precio modificado autorizadamente.");
+          soundService.playSound('success');
+      } else if (action.type === 'refund') {
+          setTransactionToReturn(action.payload);
+          setIsHistoryModalOpen(false);
+          setIsReturnModalOpen(true);
+      } else if (action.type === 'itemDiscount') {
+          applyItemDiscount(action.payload.itemId, action.payload.discount);
+          showToast("Descuento aplicado.");
+          soundService.playSound('success');
+      } else if (action.type === 'globalDiscount') {
+          applyGlobalDiscount(action.payload.discount);
+          showToast("Descuento global aplicado.");
+          soundService.playSound('success');
+      }
+  };
+
+  const handleOverrideSuccess = async (adminUser: User) => {
+      setIsAdminOverrideOpen(false);
+      if (pendingAction) {
+          await dbService.logAction('ADMIN_OVERRIDE', `Acción autorizada por ${adminUser.name}: ${pendingAction.type}`, 'warning', adminUser);
+          executeProtectedAction(pendingAction);
+          setPendingAction(null);
+      }
+  };
+
+  const requestProtectedAction = (type: 'priceOverride' | 'refund' | 'itemDiscount' | 'globalDiscount', payload: any, actionName: string) => {
+      if (currentUser?.role === 'admin') {
+          executeProtectedAction({ type, payload });
+      } else {
+          setPendingAction({ type, payload });
+          setIsAdminOverrideOpen(true);
+      }
+  };
+
+  const handleRequestPriceOverride = (itemId: string, newPrice: number | null) => {
+      requestProtectedAction('priceOverride', { itemId, newPrice }, 'Anular Precio');
+  };
+
+  const handleRequestItemDiscount = (itemId: string, discount: { type: 'percentage' | 'fixed'; value: number } | null) => {
+      if (discount === null || discount.value <= 0) {
+          applyItemDiscount(itemId, discount); // Removing discount doesn't require permission
+      } else {
+          requestProtectedAction('itemDiscount', { itemId, discount }, 'Aplicar Descuento Item');
+      }
+  };
+
+  const handleRequestGlobalDiscount = (discount: { type: 'percentage' | 'fixed'; value: number } | null) => {
+      if (discount === null || discount.value <= 0) {
+          applyGlobalDiscount(discount); // Removing discount doesn't require permission
+      } else {
+          requestProtectedAction('globalDiscount', { discount }, 'Aplicar Descuento Global');
+      }
+  };
+
+  const handleOpenReturnModal = (transaction: Transaction) => {
+      requestProtectedAction('refund', transaction, 'Iniciar Reembolso');
+  };
+
+  // Shortcuts & Barcode Listener
   useEffect(() => {
     if (!currentUser) return; 
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const activeElement = document.activeElement;
-      const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+      const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT');
       
       if (!isInputFocused && !document.querySelector('[role="dialog"]')) {
         if (barcodeTimerRef.current) clearTimeout(barcodeTimerRef.current);
@@ -665,9 +731,9 @@ const App: React.FC = () => {
       onClearCustomer={clearCustomerFromSale} 
       onAddCustomItem={() => setIsCustomItemModalOpen(true)}
       onParkSale={handleParkSale}
-      onApplyItemDiscount={applyItemDiscount}
-      onApplyGlobalDiscount={applyGlobalDiscount}
-      onApplyPriceOverride={handleRequestPriceOverride}
+      onApplyItemDiscount={handleRequestItemDiscount} // Security applied here
+      onApplyGlobalDiscount={handleRequestGlobalDiscount} // Security applied here
+      onApplyPriceOverride={handleRequestPriceOverride} // Protected
       onApplyPromotion={applyPromotion}
       onApplyLoyaltyDiscount={applyLoyaltyDiscount}
       onClose={onClose} 
@@ -698,7 +764,6 @@ const App: React.FC = () => {
   return (
     <div className={`${theme} font-sans`}>
       <div className="flex h-screen flex-col bg-dp-soft-gray dark:bg-dp-dark text-dp-dark-gray dark:text-dp-light-gray">
-        
         {/* Header */}
         <header className="flex flex-col border-b border-dp-soft-gray-dark/10 bg-dp-light dark:bg-dp-dark shadow-md flex-shrink-0 z-10">
             <div className="flex h-16 w-full items-center justify-between px-6">
@@ -749,22 +814,28 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center mb-4 gap-4 flex-shrink-0 flex-wrap min-h-[40px]">
               <h2 className="text-xl font-semibold hidden sm:block">{viewingCustomer ? `Perfil de ${viewingCustomer.name}` : ''}</h2> 
               
-              <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto justify-end">
                   {currentView === 'catalog' && (
                     <>
-                    <div className="flex items-center gap-2 p-1 rounded-lg bg-dp-soft-gray dark:bg-dp-charcoal overflow-x-auto max-w-full">
+                    {/* Line 1 (Mobile) / Left (Desktop): Operations Group */}
+                    <div className="flex items-center gap-2 p-1 rounded-lg bg-dp-soft-gray dark:bg-dp-charcoal overflow-x-auto max-w-full w-full sm:w-auto justify-center sm:justify-start order-1">
                       <button onClick={() => setIsCashManagementModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold transition-colors bg-dp-light dark:bg-black shadow hover:bg-gray-200 dark:hover:bg-gray-800 whitespace-nowrap"><DollarSign size={16} /><span>Caja</span></button>
                       <button onClick={() => setIsSummaryModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold transition-colors bg-dp-light dark:bg-black shadow hover:bg-gray-200 dark:hover:bg-gray-800 whitespace-nowrap"><BookCheck size={16} /><span>Cierre</span></button>
                       <button onClick={() => setIsShiftHistoryModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold transition-colors bg-dp-light dark:bg-black shadow hover:bg-gray-200 dark:hover:bg-gray-800 whitespace-nowrap"><Archive size={16} /><span>Turnos</span></button>
                     </div>
-                    <button onClick={() => setIsParkedSalesModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-600 text-dp-light hover:bg-gray-700 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700 relative whitespace-nowrap"><ParkingSquare size={18} /><span>Aparcadas</span>{parkedSales.length > 0 && <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">{parkedSales.length}</span>}</button>
-                    <button onClick={() => setIsHistoryModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-600 text-dp-light hover:bg-gray-700 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700 whitespace-nowrap"><History size={18} /><span>Ventas</span></button>
-                    {currentUser.role === 'admin' && (
-                        <>
-                            <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-dp-blue text-dp-light hover:bg-blue-700 dark:bg-dp-gold dark:text-dp-dark dark:hover:bg-yellow-500 whitespace-nowrap"><PlusCircle size={18} /><span>Producto</span></button>
-                            <button onClick={() => setIsSettingsModalOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-500 text-dp-light hover:bg-gray-600 dark:bg-gray-600 dark:text-dp-light-gray dark:hover:bg-gray-700"><Settings size={18} /></button>
-                        </>
-                    )}
+                    
+                    {/* Line 2 (Mobile) / Right (Desktop): Actions Group */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end overflow-x-auto order-2">
+                        <button onClick={() => setIsHistoryModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-600 text-dp-light hover:bg-gray-700 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700 whitespace-nowrap"><History size={18} /><span>Ventas</span></button>
+                        <button onClick={() => setIsParkedSalesModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-600 text-dp-light hover:bg-gray-700 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700 relative whitespace-nowrap"><PauseCircle size={18} /><span>Pausadas</span>{parkedSales.length > 0 && <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">{parkedSales.length}</span>}</button>
+                        
+                        {currentUser.role === 'admin' && (
+                            <>
+                                <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-dp-blue text-dp-light hover:bg-blue-700 dark:bg-dp-gold dark:text-dp-dark dark:hover:bg-yellow-500 whitespace-nowrap"><PlusCircle size={18} /><span>Producto</span></button>
+                                <button onClick={() => setIsSettingsModalOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-500 text-dp-light hover:bg-gray-600 dark:bg-gray-600 dark:text-dp-light-gray dark:hover:bg-gray-700"><Settings size={18} /></button>
+                            </>
+                        )}
+                    </div>
                     </>
                   )}
               </div>
@@ -772,9 +843,63 @@ const App: React.FC = () => {
             <div className="flex flex-1 overflow-hidden">
                 {currentUser.role === 'admin' && currentView === 'catalog' && <FavoritesPanel products={favoriteProducts} onProductClick={handleProductClick} />}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    {currentView === 'catalog' ? (<><div className="mb-4 flex-shrink-0"><div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Buscar producto... (o escanear código)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-12 py-2 rounded-lg border focus:ring-2 bg-dp-light dark:bg-dp-charcoal border-gray-300 dark:border-gray-600 focus:ring-dp-blue focus:ring-dp-gold focus:border-transparent"/><button onClick={() => setIsCommandPaletteOpen(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-500 hover:bg-dp-soft-gray dark:hover:bg-gray-700" title="Búsqueda Rápida (Ctrl+K)" aria-label="Abrir paleta de comandos (Ctrl+K)"><Command size={18} /></button></div><div className="flex flex-wrap items-center gap-2">{categories.map(category => (<button key={category} onClick={() => setSelectedCategory(category)} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${selectedCategory === category ? 'bg-dp-blue text-dp-light dark:bg-dp-gold dark:text-dp-dark' : 'bg-dp-soft-gray text-dp-dark-gray hover:bg-gray-300 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700'}`}>{category === 'all' ? 'Todos' : category}</button>))}</div></div><div className="flex-grow overflow-y-auto pr-1">{<ProductGrid products={filteredProducts} favorites={favorites} userRole={currentUser.role} onToggleFavorite={handleToggleFavorite} onProductClick={handleProductClick} onEditProduct={handleEditProduct} onDeleteProduct={handleDeleteProduct}/>}</div></>)
+                    {currentView === 'catalog' ? (
+                    <>
+                        <div className="mb-4 flex-shrink-0">
+                            <div className="flex gap-2 items-center mb-3">
+                                <div className="relative flex-grow">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar producto... (o escanear código)" 
+                                        value={searchTerm} 
+                                        onChange={(e) => setSearchTerm(e.target.value)} 
+                                        className="w-full pl-10 pr-12 py-2 rounded-lg border focus:ring-2 bg-dp-light dark:bg-dp-charcoal border-gray-300 dark:border-gray-600 focus:ring-dp-blue dark:focus:ring-dp-gold focus:border-transparent"
+                                    />
+                                    <button onClick={() => setIsCommandPaletteOpen(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-500 hover:bg-dp-soft-gray dark:hover:bg-gray-700" title="Búsqueda Rápida (Ctrl+K)" aria-label="Abrir paleta de comandos (Ctrl+K)">
+                                        <Command size={18} />
+                                    </button>
+                                </div>
+                                <div className="flex bg-gray-200 dark:bg-gray-800 rounded-lg p-1 flex-shrink-0">
+                                     <button 
+                                        onClick={() => { setViewMode('grid'); soundService.playSound('click'); }} 
+                                        className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-dp-charcoal shadow text-dp-blue dark:text-dp-gold' : 'text-gray-500'}`}
+                                        title="Vista Cuadrícula"
+                                     >
+                                         <LayoutGrid size={20} />
+                                     </button>
+                                     <button 
+                                        onClick={() => { setViewMode('list'); soundService.playSound('click'); }} 
+                                        className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-dp-charcoal shadow text-dp-blue dark:text-dp-gold' : 'text-gray-500'}`}
+                                        title="Vista Lista"
+                                     >
+                                         <List size={20} />
+                                     </button>
+                                 </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {['all', ...categories].map(category => (
+                                    <button key={category} onClick={() => setSelectedCategory(category)} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${selectedCategory === category ? 'bg-dp-blue text-dp-light dark:bg-dp-gold dark:text-dp-dark' : 'bg-dp-soft-gray text-dp-dark-gray hover:bg-gray-300 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700'}`}>{category === 'all' ? 'Todos' : category}</button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex-grow overflow-y-auto pr-1">
+                            <ProductGrid 
+                                products={filteredProducts} 
+                                favorites={favorites} 
+                                userRole={currentUser.role} 
+                                onToggleFavorite={handleToggleFavorite} 
+                                onProductClick={handleProductClick} 
+                                onEditProduct={handleEditProduct} 
+                                onDeleteProduct={handleDeleteProduct} 
+                                viewMode={viewMode} 
+                                favoriteProducts={favoriteProducts} 
+                            />
+                        </div>
+                    </>
+                    )
                     : currentView === 'dashboard' ? <Dashboard onGeneratePO={handleGeneratePO} />
-                    : currentView === 'inventory' ? <Inventory products={products} onUpdateStock={handleStockUpdate} />
+                    : currentView === 'inventory' ? <Inventory products={products} categories={categories} currentUser={currentUser} onUpdateStock={handleStockUpdate} onUpdateProduct={handleUpdateProduct} />
                     : currentView === 'customers' ? (viewingCustomer ? <CustomerDetail customer={viewingCustomer} onBack={() => setViewingCustomer(null)} onEdit={handleOpenEditCustomerModal} onDelete={handleDeleteCustomer} /> : <Customers customers={customers} onAddCustomer={() => setIsAddCustomerModalOpen(true)} onViewCustomer={setViewingCustomer} />)
                     : <PurchaseOrders purchaseOrders={purchaseOrders} onViewDetails={handleViewPODetails} />}
                 </div>
@@ -787,7 +912,12 @@ const App: React.FC = () => {
       
       {isAdminOverrideOpen && pendingAction && (
           <AdminOverrideModal 
-            actionName={pendingAction.type === 'priceOverride' ? 'Cambiar Precio' : 'Autorizar Reembolso'}
+            actionName={
+                pendingAction.type === 'priceOverride' ? 'Cambiar Precio' : 
+                pendingAction.type === 'refund' ? 'Autorizar Reembolso' :
+                pendingAction.type === 'itemDiscount' ? 'Aplicar Descuento Item' :
+                'Aplicar Descuento Global'
+            }
             onClose={() => { setIsAdminOverrideOpen(false); setPendingAction(null); }}
             onSuccess={handleOverrideSuccess}
           />
@@ -795,16 +925,16 @@ const App: React.FC = () => {
 
       {isUpgradeModalOpen && <UpgradeModal onClose={() => setIsUpgradeModalOpen(false)} />}
 
-      {isAddModalOpen && <AddProductModal onClose={() => setIsAddModalOpen(false)} onSave={handleSaveNewProduct} onOpenSmartScanner={() => { setIsAddModalOpen(false); setIsSmartScannerOpen(true); }} onOpenVoiceIngest={() => { setIsAddModalOpen(false); setIsVoiceIngestOpen(true); }} onRequestUpgrade={() => setIsUpgradeModalOpen(true)} />}
+      {isAddModalOpen && <AddProductModal onClose={() => setIsAddModalOpen(false)} onSave={handleSaveNewProduct} onOpenSmartScanner={() => { setIsAddModalOpen(false); setIsSmartScannerOpen(true); }} onOpenVoiceIngest={() => { setIsAddModalOpen(false); setIsVoiceIngestOpen(true); }} onRequestUpgrade={() => setIsUpgradeModalOpen(true)} existingCategories={categories} />}
       {isEditModalOpen && productToEdit && <EditProductModal product={productToEdit} onClose={() => { setIsEditModalOpen(false); setProductToEdit(null); }} onSave={handleUpdateProduct} />}
       {isHistoryModalOpen && <SalesHistoryModal onClose={() => setIsHistoryModalOpen(false)} onReturn={handleOpenReturnModal} onPrintReceipt={handlePrintReceipt}/>}
       {isSummaryModalOpen && <CashDrawerSummaryModal onClose={() => setIsSummaryModalOpen(false)} onFinalizeShift={handleFinalizeShift} />}
       {isShiftHistoryModalOpen && <ShiftHistoryModal onClose={() => setIsShiftHistoryModalOpen(false)} />}
-      {isSettingsModalOpen && <SettingsModal onClose={() => setIsSettingsModalOpen(false)} onImportSuccess={handleImportSuccess} onSettingsSaved={handleSettingsSaved} />}
+      {isSettingsModalOpen && <SettingsModal onClose={() => setIsSettingsModalOpen(false)} onImportSuccess={handleImportSuccess} onSettingsSaved={handleSettingsSaved} products={products} />}
       {isPaymentModalOpen && <PaymentModal total={getTotals().finalTotal} onClose={() => setIsPaymentModalOpen(false)} onConfirm={handleConfirmPayment} />}
       {isPostSaleModalOpen && completedTransaction && <PostSaleConfirmationModal transaction={completedTransaction} onClose={() => setIsPostSaleModalOpen(false)} onPrintReceipt={() => handlePrintReceipt(completedTransaction)}/>}
       {isReceiptModalOpen && transactionForReceipt && <ReceiptModal transaction={transactionForReceipt} onClose={() => setIsReceiptModalOpen(false)} />}
-      {isCommandPaletteOpen && <CommandPaletteModal products={products} onClose={() => setIsCommandPaletteOpen(false)} onSelect={handleCommandSelect} />}
+      {isCommandPaletteOpen && <CommandPaletteModal products={products} currentUser={currentUser} onClose={() => setIsCommandPaletteOpen(false)} onSelect={handleCommandSelect} />}
       {isPODetailOpen && selectedPO && <PurchaseOrderDetailModal po={selectedPO} onClose={() => setIsPODetailOpen(false)} onUpdateStatus={handleUpdatePOStatus} />}
       {isAddCustomerModalOpen && <AddCustomerModal onClose={() => setIsAddCustomerModalOpen(false)} onSave={handleSaveNewProduct} />}
       {isEditCustomerModalOpen && customerToEdit && <EditCustomerModal customer={customerToEdit} onClose={() => setIsEditCustomerModalOpen(false)} onSave={handleUpdateCustomer} />}

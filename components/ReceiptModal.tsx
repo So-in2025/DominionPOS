@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import type { Transaction, BusinessSettings } from '../types';
 import { getBusinessSettings } from '../services/settings';
@@ -29,7 +28,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, onClose }) => 
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center backdrop-blur-sm"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center backdrop-blur-sm"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

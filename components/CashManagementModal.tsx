@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { CashMovement } from '../types';
 import * as dbService from '../services/db';
@@ -52,7 +51,7 @@ const CashManagementModal: React.FC<CashManagementModalProps> = ({ onClose, onSa
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
       <div className="bg-white dark:bg-dp-dark rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-modal-in flex flex-col md:flex-row border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
         
         {/* Left: Input Section */}

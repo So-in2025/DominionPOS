@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import type { Product } from '../types';
-import { BrainCircuit, Mic, Lock, Crown, Zap } from 'lucide-react';
+import { BrainCircuit, Mic, Lock, Crown, Zap, CheckCircle } from 'lucide-react';
 import * as cloudService from '../services/cloud';
+import * as settingsService from '../services/settings';
 
 interface AddProductModalProps {
   onClose: () => void;
@@ -10,9 +11,10 @@ interface AddProductModalProps {
   onOpenSmartScanner: () => void;
   onOpenVoiceIngest: () => void;
   onRequestUpgrade: () => void;
+  existingCategories?: string[];
 }
 
-const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOpenSmartScanner, onOpenVoiceIngest, onRequestUpgrade }) => {
+const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOpenSmartScanner, onOpenVoiceIngest, onRequestUpgrade, existingCategories = [] }) => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
@@ -21,6 +23,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
   const [error, setError] = useState('');
 
   const hasAiAccess = cloudService.hasAccess('ai_scanner');
+  
+  // Check free quota availability (Peek only, do not consume)
+  const hasFreeImage = settingsService.checkFreeQuota('image');
+  const hasFreeVoice = settingsService.checkFreeQuota('voice');
 
   const handleSave = () => {
     const parsedPrice = parseFloat(price);
@@ -49,9 +55,29 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
     });
   };
 
+  const handleSmartScan = () => {
+      // Logic: If Pro OR has free quota left, allow open. 
+      // Consumption happens inside the modal ON SUCCESS.
+      if (hasAiAccess || hasFreeImage) {
+          onOpenSmartScanner();
+      } else {
+          onRequestUpgrade();
+      }
+  };
+
+  const handleVoiceIngest = () => {
+      // Logic: If Pro OR has free quota left, allow open. 
+      // Consumption happens inside the modal ON SUCCESS.
+      if (hasAiAccess || hasFreeVoice) {
+          onOpenVoiceIngest();
+      } else {
+          onRequestUpgrade();
+      }
+  };
+
   return (
     <div 
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
@@ -59,7 +85,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
       <div className="bg-dp-light dark:bg-dp-charcoal rounded-lg shadow-2xl p-6 w-full max-w-md m-4 animate-modal-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl font-bold mb-4 text-dp-dark-gray dark:text-dp-light-gray">Añadir Nuevo Producto</h2>
         
-        {/* AI Methods Section - VISIBLE BUT LOCKED FOR FREE USERS */}
+        {/* AI Methods Section */}
         <div className={`mb-6 p-4 rounded-lg border ${hasAiAccess ? 'bg-dp-soft-gray dark:bg-black/20 border-gray-200 dark:border-gray-700' : 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 border-yellow-500/30'}`}>
             <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3 flex items-center justify-between">
                 Ingreso Inteligente (IA)
@@ -67,14 +93,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
             </h3>
             <div className="grid grid-cols-2 gap-3">
                 <button 
-                    onClick={hasAiAccess ? onOpenSmartScanner : onRequestUpgrade}
+                    onClick={handleSmartScan}
                     className={`relative flex flex-col items-center justify-center p-3 rounded-lg border transition-all group w-full h-full overflow-hidden ${
-                        hasAiAccess 
+                        hasAiAccess || hasFreeImage
                         ? 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-dp-blue dark:hover:border-dp-gold hover:shadow-md' 
                         : 'bg-white/50 dark:bg-black/40 border-gray-300 dark:border-gray-700 hover:border-yellow-500 dark:hover:border-yellow-500'
                     }`}
                 >
-                    {!hasAiAccess && (
+                    {!hasAiAccess && !hasFreeImage && (
                         <div className="absolute inset-0 bg-gray-200/20 dark:bg-black/20 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                             <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded shadow-lg flex items-center gap-1">
                                 <Lock size={12}/> Desbloquear
@@ -82,14 +108,19 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
                         </div>
                     )}
                     <div className={`p-2 rounded-full mb-2 transition-transform group-hover:scale-110 ${
-                        hasAiAccess ? 'bg-blue-100 dark:bg-blue-900/30 text-dp-blue dark:text-blue-300' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                        hasAiAccess || hasFreeImage ? 'bg-blue-100 dark:bg-blue-900/30 text-dp-blue dark:text-blue-300' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
                     }`}>
                         <BrainCircuit size={24} />
                     </div>
-                    <span className={`text-sm font-semibold ${hasAiAccess ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500'}`}>
+                    <span className={`text-sm font-semibold ${hasAiAccess || hasFreeImage ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500'}`}>
                         Escáner Foto
                     </span>
-                    {!hasAiAccess && (
+                    {!hasAiAccess && hasFreeImage && (
+                        <div className="absolute top-2 right-2 text-green-600 bg-green-100 dark:bg-green-900 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
+                            1 Gratis
+                        </div>
+                    )}
+                    {!hasAiAccess && !hasFreeImage && (
                         <div className="absolute top-2 right-2 text-gray-400 dark:text-gray-600">
                             <Lock size={14} />
                         </div>
@@ -97,14 +128,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
                 </button>
                 
                 <button 
-                    onClick={hasAiAccess ? onOpenVoiceIngest : onRequestUpgrade}
+                    onClick={handleVoiceIngest}
                     className={`relative flex flex-col items-center justify-center p-3 rounded-lg border transition-all group w-full h-full overflow-hidden ${
-                        hasAiAccess 
+                        hasAiAccess || hasFreeVoice
                         ? 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-dp-blue dark:hover:border-dp-gold hover:shadow-md' 
                         : 'bg-white/50 dark:bg-black/40 border-gray-300 dark:border-gray-700 hover:border-yellow-500 dark:hover:border-yellow-500'
                     }`}
                 >
-                    {!hasAiAccess && (
+                    {!hasAiAccess && !hasFreeVoice && (
                         <div className="absolute inset-0 bg-gray-200/20 dark:bg-black/20 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                             <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded shadow-lg flex items-center gap-1">
                                 <Lock size={12}/> Desbloquear
@@ -112,14 +143,19 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
                         </div>
                     )}
                     <div className={`p-2 rounded-full mb-2 transition-transform group-hover:scale-110 ${
-                        hasAiAccess ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                        hasAiAccess || hasFreeVoice ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
                     }`}>
                         <Mic size={24} />
                     </div>
-                    <span className={`text-sm font-semibold ${hasAiAccess ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500'}`}>
+                    <span className={`text-sm font-semibold ${hasAiAccess || hasFreeVoice ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500'}`}>
                         Dictado Voz
                     </span>
-                    {!hasAiAccess && (
+                    {!hasAiAccess && hasFreeVoice && (
+                        <div className="absolute top-2 right-2 text-green-600 bg-green-100 dark:bg-green-900 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
+                            1 Gratis
+                        </div>
+                    )}
+                    {!hasAiAccess && !hasFreeVoice && (
                         <div className="absolute top-2 right-2 text-gray-400 dark:text-gray-600">
                             <Lock size={14} />
                         </div>
@@ -131,7 +167,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
                 <div className="mt-3 text-center">
                     <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1">
                         <Zap size={12} className="text-yellow-500"/>
-                        Ahorra tiempo automatizando la carga de stock.
+                        Prueba la IA gratis una vez al mes.
                     </p>
                 </div>
             )}
@@ -181,10 +217,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSave, onOp
                 <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Categoría</label>
                 <input 
                     type="text" 
+                    list="category-list"
                     value={category} 
                     onChange={(e) => setCategory(e.target.value)} 
                     className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 focus:ring-dp-blue dark:focus:ring-dp-gold" 
                 />
+                <datalist id="category-list">
+                    {existingCategories.map(cat => <option key={cat} value={cat} />)}
+                </datalist>
              </div>
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Stock Bajo</label>

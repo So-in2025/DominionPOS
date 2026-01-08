@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { PurchaseOrder } from '../types';
 import { X, CheckCircle, Package, Truck, Inbox } from 'lucide-react';
@@ -12,7 +11,7 @@ interface PurchaseOrderDetailModalProps {
 const PurchaseOrderDetailModal: React.FC<PurchaseOrderDetailModalProps> = ({ po, onClose, onUpdateStatus }) => {
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

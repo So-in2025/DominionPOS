@@ -135,6 +135,8 @@ export interface BusinessSettings {
   phone: string;
   receiptFooter: string;
   logoUrl?: string; 
+  customCategories?: string[];
+  googleApiKey?: string; // BYOK for Pro Users
 }
 
 export interface User {
@@ -198,4 +200,4 @@ export interface LicenseStatus {
     message: string;
 }
 
-export type BusinessType = 'kiosco' | 'cafe' | 'ferreteria' | 'ropa';
+export type BusinessType = 'kiosco' | 'despensa' | 'cafeteria' | 'pasteleria' | 'perfumeria' | 'limpieza' | 'mascotas' | 'comidas';

@@ -307,7 +307,7 @@ const SalePanel: React.FC<SalePanelProps> = (props) => {
             </div>
         )}
         <div className="grid grid-cols-2 gap-2 mb-4">
-            <button onClick={() => onParkSale()} disabled={items.length === 0} className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-sm font-semibold transition-colors bg-dp-soft-gray hover:bg-gray-300 dark:bg-dp-charcoal dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"><PauseCircle size={16} />Aparcar Venta</button>
+            <button onClick={() => onParkSale()} disabled={items.length === 0} className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-sm font-semibold transition-colors bg-dp-soft-gray hover:bg-gray-300 dark:bg-dp-charcoal dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"><PauseCircle size={16} />Pausar Venta</button>
             <button onClick={() => setIsPromotionsModalOpen(true)} disabled={isAnyDiscountActive} className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-sm font-semibold transition-colors bg-dp-soft-gray hover:bg-gray-300 dark:bg-dp-charcoal dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"><Gift size={16} />Promociones</button>
         </div>
         <div className="space-y-1 text-sm mb-4 font-medium">

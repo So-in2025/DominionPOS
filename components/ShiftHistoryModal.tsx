@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { ShiftSummary } from '../types';
 import * as dbService from '../services/db';
@@ -39,16 +38,16 @@ const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
+      className="fixed inset-0 bg-white sm:bg-black/60 z-[60] flex justify-center items-center"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
     >
       <div 
-        className="bg-dp-light dark:bg-dp-charcoal rounded-lg shadow-2xl p-6 w-full max-w-4xl m-4 flex flex-col max-h-[80vh] animate-modal-in" 
+        className="bg-dp-light dark:bg-dp-charcoal w-full h-full sm:h-auto sm:max-h-[80vh] sm:rounded-lg sm:shadow-2xl p-6 sm:max-w-4xl sm:m-4 flex flex-col animate-modal-in" 
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 flex-shrink-0">
             <h2 className="text-2xl font-bold text-dp-dark-gray dark:text-dp-light-gray flex items-center gap-2"><Archive />Historial de Turnos</h2>
             <button
                 onClick={onClose}
@@ -74,7 +73,7 @@ const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
                         <p className="font-semibold text-gray-800 dark:text-gray-200">Cierre del: {new Date(s.createdAt).toLocaleString()}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">ID: {s.id}</p>
                     </div>
-                    <div className="text-right mx-4">
+                    <div className="text-right mx-4 hidden sm:block">
                       <p className="font-bold text-lg text-dp-blue dark:text-dp-gold">${s.totalSales.toLocaleString()}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Ventas Totales</p>
                     </div>
@@ -130,7 +129,7 @@ const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
           )}
         </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex justify-end flex-shrink-0">
              <button
               type="button"
               onClick={onClose}

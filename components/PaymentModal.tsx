@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CreditCard, DollarSign, X, Delete, ChevronRight } from 'lucide-react';
 import * as soundService from '../services/sound';
@@ -94,7 +93,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ total, onClose, onConfirm }
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 z-50 flex justify-center items-end sm:items-center backdrop-blur-sm"
+      className="fixed inset-0 bg-black/80 z-[60] flex justify-center items-end sm:items-center backdrop-blur-sm"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

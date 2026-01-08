@@ -3,6 +3,8 @@ import React, { useState, useRef } from 'react';
 import { X, Camera, Upload, BrainCircuit, ArrowRight, AlertTriangle, CheckCircle, Loader2, Save, Layers } from 'lucide-react';
 import * as aiService from '../services/ai';
 import * as dbService from '../services/db';
+import * as settingsService from '../services/settings';
+import * as cloudService from '../services/cloud';
 import type { Product, PriceHistoryEntry } from '../types';
 
 interface SmartScannerModalProps {
@@ -103,6 +105,12 @@ const SmartScannerModal: React.FC<SmartScannerModalProps> = ({ onClose, onProduc
   const handleConfirmUpdates = async () => {
       setIsSaving(true);
       try {
+          // --- CONSUME QUOTA HERE ON SUCCESSFUL SAVE ---
+          const isPro = cloudService.hasAccess('ai_scanner');
+          if (!isPro) {
+              settingsService.incrementFreeQuota('image');
+          }
+
           for (const item of scannedItems) {
               if (item.matchId) {
                   const product = dbService.getProducts().find(p => p.id === item.matchId);
@@ -142,7 +150,7 @@ const SmartScannerModal: React.FC<SmartScannerModalProps> = ({ onClose, onProduc
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/80 z-[60] flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
       <div className="bg-dp-light dark:bg-dp-charcoal rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] overflow-hidden animate-modal-in border border-dp-blue/30 dark:border-dp-gold/30" onClick={e => e.stopPropagation()}>
         
         <div className="bg-dp-soft-gray dark:bg-black/40 p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center flex-shrink-0">

@@ -16,7 +16,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
   
   const getMessage = () => {
       let planText = "ABONO PRO";
-      if (selectedInterest === 'prepago') planText = "PLAN PREPAGO";
+      if (selectedInterest === 'prepago') planText = "PLAN BASE";
       if (selectedInterest === 'anual') planText = "PRO ANUAL";
       
       return `Hola! Estoy interesado en el ${planText} para DOMINION POS.\n\nMi ID de Soporte es: *${identity.licenseKey}*\n\n(Enviado desde la App)`;
@@ -26,10 +26,13 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[60] flex justify-center items-center backdrop-blur-sm p-4 animate-modal-in" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-dp-gold/30 flex flex-col md:flex-row max-h-[90vh]" onClick={e => e.stopPropagation()}>
+      <div 
+        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl border border-dp-gold/30 flex flex-col md:flex-row max-h-[90vh] overflow-y-auto md:overflow-hidden" 
+        onClick={e => e.stopPropagation()}
+      >
         
         {/* Left Side: Pitch */}
-        <div className="md:w-1/3 bg-gradient-to-br from-gray-900 to-black p-6 text-white relative overflow-hidden flex flex-col">
+        <div className="w-full md:w-1/3 bg-gradient-to-br from-gray-900 to-black p-6 text-white relative overflow-hidden flex flex-col flex-shrink-0">
             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
             <div className="relative z-10">
                 <div className="inline-flex p-3 rounded-full bg-dp-gold/20 mb-4 ring-1 ring-dp-gold/50 shadow-[0_0_20px_rgba(212,175,55,0.3)]">
@@ -38,11 +41,11 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 <h2 className="text-2xl font-bold mb-2">Elegí tu Plan</h2>
                 <p className="text-gray-400 text-sm mb-6">Potencia tu comercio con la tecnología de Dominion.</p>
                 
-                <div className="space-y-4 flex-grow">
+                <div className="space-y-4">
                     <div className="flex gap-3 items-start">
                         <Smartphone size={20} className="text-green-400 mt-1"/>
                         <div>
-                            <h4 className="font-bold text-sm">Prepago (Único)</h4>
+                            <h4 className="font-bold text-sm">Plan Base (Único)</h4>
                             <p className="text-xs text-gray-400">1 Caja, Local, Sin vencimiento. Ideal para empezar.</p>
                         </div>
                     </div>
@@ -56,15 +59,15 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 </div>
             </div>
             
-            <div className="mt-auto relative z-10 pt-6 border-t border-gray-800">
+            <div className="mt-6 md:mt-auto relative z-10 pt-6 border-t border-gray-800">
                 <p className="text-xs text-gray-500 uppercase font-bold mb-1">Tu ID de Nodo</p>
-                <p className="font-mono text-sm text-dp-gold">{identity.licenseKey}</p>
+                <p className="font-mono text-sm text-dp-gold">{identity.licenseKey || 'Sin licencia'}</p>
             </div>
         </div>
 
         {/* Right Side: Pricing Tables */}
-        <div className="md:w-2/3 p-6 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
-            <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-black dark:hover:text-white transition-colors">
+        <div className="w-full md:w-2/3 p-6 bg-gray-50 dark:bg-gray-900 md:overflow-y-auto">
+            <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-black dark:hover:text-white transition-colors z-10 bg-white/20 rounded-full p-1 md:bg-transparent">
                 <X size={24} />
             </button>
 
@@ -77,7 +80,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedInterest === 'prepago' ? 'border-green-500 bg-green-50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 hover:border-green-300'}`}
                 >
                     <div className="flex justify-between items-center mb-2">
-                        <span className="font-bold text-green-700 dark:text-green-400 flex items-center gap-2"><Smartphone size={18}/> PREPAGO</span>
+                        <span className="font-bold text-green-700 dark:text-green-400 flex items-center gap-2"><Smartphone size={18}/> PLAN BASE</span>
                         <span className="text-xl font-black text-gray-900 dark:text-white">$14.999</span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Pago único de por vida. Funciona sin internet.</p>
@@ -131,10 +134,10 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 href={whatsappUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="mt-6 flex items-center justify-center gap-3 w-full py-4 rounded-xl font-bold text-white bg-[#25D366] hover:bg-[#20bd5a] transition-all shadow-lg hover:shadow-green-500/30 hover:-translate-y-0.5 active:translate-y-0"
+                className="mt-6 flex items-center justify-center gap-3 w-full py-4 rounded-xl font-bold text-white bg-[#25D366] hover:bg-[#20bd5a] transition-all shadow-lg hover:shadow-green-500/30 hover:-translate-y-0.5 active:translate-y-0 mb-4 md:mb-0"
             >
                 <MessageCircle size={24} fill="white" className="text-white" />
-                Solicitar {selectedInterest === 'prepago' ? 'Prepago' : selectedInterest === 'abono' ? 'Abono Pro' : 'Plan Anual'}
+                Solicitar {selectedInterest === 'prepago' ? 'Plan Base' : selectedInterest === 'abono' ? 'Abono Pro' : 'Plan Anual'}
             </a>
         </div>
       </div>
