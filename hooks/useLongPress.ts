@@ -1,4 +1,5 @@
 
+
 import React, { useCallback, useRef, useEffect } from 'react';
 
 interface LongPressOptions {
@@ -13,7 +14,8 @@ const useLongPress = (
   { delay = 350, initialSpeed = 150, minSpeed = 50, speedRampFactor = 0.9 }: LongPressOptions = {}
 ) => {
   const callbackRef = useRef(callback);
-  const timeoutRef = useRef<number>();
+  // Fix: Explicitly provide undefined to useRef to satisfy the expected 1 argument in some TypeScript environments.
+  const timeoutRef = useRef<number | undefined>(undefined);
   const isPressedRef = useRef(false);
 
   useEffect(() => {

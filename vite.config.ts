@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: './', // Esto asegura que los archivos se carguen bien en subcarpetas de GitHub
   build: {
     outDir: 'dist',
     sourcemap: false
