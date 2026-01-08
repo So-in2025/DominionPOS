@@ -106,7 +106,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Entrá barato y tené todo. Potencia total.</p>
                     <ul className="text-sm space-y-1">
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-blue-500"/> <strong>Multi-Caja</strong> (Varios dispositivos)</li>
+                        <li className="flex gap-2"><CheckCircle size={14} className="text-blue-500"/> <strong>3 Usuarios</strong> (Dueño + 2 Operadores)</li>
                         <li className="flex gap-2"><CheckCircle size={14} className="text-blue-500"/> <strong>Backup Automático en Nube</strong></li>
                         <li className="flex gap-2"><CheckCircle size={14} className="text-blue-500"/> Reportes Avanzados + Soporte</li>
                     </ul>

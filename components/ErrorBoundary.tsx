@@ -10,10 +10,20 @@ interface State {
   error: Error | null;
 }
 
+/**
+ * ErrorBoundary catches JavaScript errors anywhere in their child component tree,
+ * logs those errors, and displays a fallback UI instead of the component tree that crashed.
+ */
+// Fix: Explicitly extending Component from react helps TypeScript resolve 'this.props' correctly
 class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null
+  };
+
+  // Fix: Explicit constructor passing props to super for better type resolution in some environments
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error: Error): State {
@@ -67,7 +77,8 @@ class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return this.props.children;
+    // Fix: Access children from this.props which is now correctly recognized via Component extension.
+    return this.props.children || null;
   }
 }
 

@@ -1,4 +1,3 @@
-
 export interface PriceHistoryEntry {
   date: number;
   costPrice: number;
@@ -136,7 +135,7 @@ export interface BusinessSettings {
   receiptFooter: string;
   logoUrl?: string; 
   customCategories?: string[];
-  googleApiKey?: string; // BYOK for Pro Users
+  // Fix: Removed googleApiKey as per guidelines prohibiting user-managed API keys.
 }
 
 export interface User {

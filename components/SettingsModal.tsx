@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { X, Download, Upload, Store, Image as ImageIcon, BrainCircuit, CloudLightning, Signal, Lock, Smartphone, CheckCircle, Crown, Users, UserMinus, ShieldCheck, User as UserIcon, Plus, Info, Database, Loader2, Tags, Edit3, Trash2, Save, Key } from 'lucide-react';
 import * as dbService from '../services/db';
@@ -56,7 +55,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
           setNexusKey(identity.licenseKey);
       }
       
-      // Combine product categories with custom saved categories
       const productCats = new Set(products.map(p => p.category).filter(Boolean));
       const savedCats = businessSettings.customCategories || [];
       savedCats.forEach(c => productCats.add(c));
@@ -68,7 +66,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
       setUsers(dbService.getUsers());
   };
 
-  // ... (Export/Import logic)
   const handleExport = async () => {
       soundService.playSound('click');
       const data = await dbService.exportDatabase();
@@ -115,11 +112,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
   // --- USER MANAGEMENT ---
   const handleStartAddUser = () => {
       const currentPlan = cloudService.getPlan();
-      const maxUsers = currentPlan === 'pro' ? 2 : currentPlan === 'enterprise' ? 6 : 1;
+      // Ajuste: Plan PRO ahora soporta 3 usuarios
+      const maxUsers = currentPlan === 'pro' ? 3 : currentPlan === 'enterprise' ? 6 : 1;
       
       if (users.length >= maxUsers) {
           soundService.playSound('pop');
-          setIsUpgradeModalOpen(true); // Soft Gate
+          setIsUpgradeModalOpen(true); 
           return;
       }
       
@@ -146,7 +144,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
       }
 
       if (editingUserId) {
-          // Update
           await dbService.updateUser({
               id: editingUserId,
               name: userNameInput.trim(),
@@ -155,7 +152,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
           });
           soundService.playSound('success');
       } else {
-          // Create
           await dbService.addUser({
               name: userNameInput.trim(),
               role: userRoleInput,
@@ -185,7 +181,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
       }
   };
 
-  // ... (Logo & Settings logic)
   const handleConnectNexus = async () => {
       if(!nexusKey.trim()) return;
       setNexusStatus({ connecting: true, msg: 'Validando...', type: 'neutral' });
@@ -220,7 +215,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
       onSettingsSaved();
   };
   
-  // --- CATEGORY LOGIC ---
   const handleCreateCategory = () => {
       if(!createCategoryName.trim()) return;
       const newCat = createCategoryName.trim();
@@ -284,7 +278,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
   const currentPlan = cloudService.getPlan();
   const isFreeTier = currentPlan === 'starter';
 
-  // ... (TicketPreview)
   const TicketPreview = ({ plan }: { plan: 'starter' | 'pro' }) => (
     <div className="bg-white p-3 shadow-md rounded border border-gray-200 text-black font-mono text-[8px] flex flex-col items-center w-36 scale-90 origin-top">
         {plan === 'pro' && (
@@ -318,7 +311,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
     <div className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center backdrop-blur-sm" aria-modal="true" role="dialog" onClick={onClose}>
       <div className="bg-dp-soft-gray dark:bg-dp-dark rounded-2xl shadow-2xl p-0 w-full max-w-2xl m-4 animate-modal-in overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         
-        {/* Header */}
         <div className="bg-white dark:bg-dp-charcoal px-6 py-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
             <div>
                 <h2 className="text-2xl font-black text-dp-dark-gray dark:text-dp-light-gray tracking-tight">Panel de Control</h2>
@@ -329,7 +321,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           
-          {/* Nexus Cloud Banner */}
           <div className="p-6 rounded-2xl bg-gradient-to-br from-dp-dark-gray to-black text-white shadow-xl relative group overflow-hidden border border-gray-700/50">
              <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-110 transition-transform duration-700"><CloudLightning size={200} /></div>
              <div className="flex justify-between items-start mb-6 relative z-10">
@@ -356,43 +347,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
              {nexusStatus.msg && <p className={`text-xs mt-3 font-bold px-1 flex items-center gap-1 ${nexusStatus.type === 'error' ? 'text-red-400' : 'text-green-400'}`}><Info size={12}/> {nexusStatus.msg}</p>}
           </div>
 
-          {/* BYOK Section for PRO Users */}
-          <FeatureGuard feature="ai_scanner" showLock={true}>
-              <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm border-l-4 border-l-purple-500">
-                  <div className="flex items-start gap-4">
-                      <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl text-purple-600 dark:text-purple-400">
-                          <BrainCircuit size={24} />
-                      </div>
-                      <div className="flex-1">
-                          <h3 className="text-lg font-black text-dp-dark-gray dark:text-dp-light-gray flex items-center gap-2">Inteligencia Artificial (BYOK)</h3>
-                          <p className="text-xs text-gray-500 mb-4">Como usuario PRO, conecta tu propia API Key de Google Gemini para uso ilimitado.</p>
-                          
-                          <div>
-                              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Google Gemini API Key</label>
-                              <div className="flex gap-2">
-                                  <input 
-                                      type="password" 
-                                      value={businessSettings.googleApiKey || ''} 
-                                      onChange={e => handleBusinessSettingChange('googleApiKey', e.target.value)} 
-                                      placeholder="AIzaSy..." 
-                                      className="flex-1 w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-black/30 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                                  />
-                                  <a 
-                                      href="https://aistudio.google.com/app/apikey" 
-                                      target="_blank" 
-                                      rel="noreferrer"
-                                      className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700"
-                                  >
-                                      <Key size={14}/> Obtener Key
-                                  </a>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-              </section>
-          </FeatureGuard>
-
-          {/* Category Management Section */}
           <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm">
               <div className="flex justify-between items-center mb-4">
                   <div>
@@ -443,14 +397,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
               </div>
           </section>
 
-          {/* User Management */}
           <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h3 className="text-lg font-black flex items-center gap-2 text-dp-dark-gray dark:text-dp-light-gray"><Users size={20} className="text-dp-blue dark:text-dp-gold"/> Gestión de Operadores</h3>
                     <p className="text-xs text-gray-500">Control de acceso y roles de caja</p>
                 </div>
-                {!isFreeTier && <span className="text-[10px] bg-dp-soft-gray dark:bg-black/40 px-3 py-1 rounded-full font-black text-gray-500 uppercase tracking-tighter">{users.length} / {currentPlan === 'pro' ? '2' : '6'} Cupos</span>}
+                {/* Ajuste visual: Reflejar límite de 3 usuarios para PRO */}
+                {!isFreeTier && <span className="text-[10px] bg-dp-soft-gray dark:bg-black/40 px-3 py-1 rounded-full font-black text-gray-500 uppercase tracking-tighter">{users.length} / {currentPlan === 'pro' ? '3' : '6'} Cupos</span>}
             </div>
             <div className="space-y-3">
                 {users.map(user => (
@@ -507,7 +461,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
             </div>
           </section>
 
-          {/* Branding & Data Maintenance */}
           <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <div><h3 className="text-lg font-black flex items-center gap-2 text-dp-dark-gray dark:text-dp-light-gray"><Store size={20} className="text-dp-blue dark:text-dp-gold"/> Perfil del Comercio</h3><p className="text-xs text-gray-500">Datos para facturación y marca</p></div>

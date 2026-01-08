@@ -72,7 +72,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     // --- LICENSE VERIFICATION LOGIC ---
     const handlePlanClick = (plan: PlanTier) => {
-        // Ahora TODOS los planes requieren verificación, incluso el Base (starter)
         setVerifyingPlan(plan);
         setLicenseInput('');
         setVerificationStatus({ loading: false, error: '', success: false });
@@ -88,16 +87,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
         setVerificationStatus({ loading: true, error: '', success: false });
         
-        // Simulate network check using existing service
         const result = await cloudService.connectToNexus(licenseInput);
         
         if (result.success) {
-            // Verificar si el plan devuelto coincide con la intención (opcional, pero recomendado)
-            // Por ahora asumimos que la clave dicta el plan
             setVerificationStatus({ loading: false, error: '', success: true });
             soundService.playSound('success');
             
-            // Wait a moment for visual feedback then close
             setTimeout(() => {
                 if (verifyingPlan) setSelectedPlan(verifyingPlan);
                 setValidatedLicenseKey(licenseInput);
@@ -140,7 +135,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         try {
             const template = BUSINESS_TEMPLATES[selectedIndustry as keyof typeof BUSINESS_TEMPLATES];
             
-            // 1. Guardar Configuración del Negocio (Incluyendo Categorías Predeterminadas)
             const currentSettings = settingsService.getBusinessSettings();
             settingsService.saveBusinessSettings({ 
                 ...currentSettings, 
@@ -148,36 +142,30 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 customCategories: template ? template.categories : [] 
             });
 
-            // 2. Aplicar Plantilla de Rubro (Productos)
             if (template) {
-                // Limpiar productos existentes (si hubiese residuales)
                 const existingProds = dbService.getProducts();
                 for (const p of existingProds) await dbService.deleteProduct(p.id);
-                // Añadir productos plantilla
                 for (const p of template.products) await dbService.addProduct(p);
                 settingsService.saveLoyaltySettings(template.loyalty);
             }
 
-            // 3. Crear Usuario ADMIN (Siempre) - PIN Hardcoded 1234
             await dbService.addUser({
                 name: 'Admin',
                 pin: '1234',
                 role: 'admin'
             });
 
-            // 4. Crear Usuario CAJA (Solo si es Pro o Empresa)
             if (selectedPlan === 'pro' || selectedPlan === 'enterprise') {
                 await dbService.addUser({
                     name: 'Caja 1',
-                    pin: '', // Sin PIN
+                    pin: '', 
                     role: 'cashier'
                 });
             }
 
-            // 5. Guardar Identidad del Nodo (Con la clave validada)
             localStorage.setItem('dominion_nexus_identity', JSON.stringify({
                 nodeId: crypto.randomUUID(),
-                licenseKey: validatedLicenseKey, // Use the verified key
+                licenseKey: validatedLicenseKey, 
                 plan: selectedPlan,
                 status: 'active',
                 lastSync: Date.now()
@@ -200,7 +188,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         const storedPlan = localStorage.getItem('dominion_nexus_identity');
         const planData = storedPlan ? JSON.parse(storedPlan).plan : 'starter';
         const currentUsers = dbService.getUsers();
-        const maxUsers = planData === 'pro' ? 2 : planData === 'enterprise' ? 6 : 1;
+        // Ajuste: Plan PRO ahora soporta 3 usuarios
+        const maxUsers = planData === 'pro' ? 3 : planData === 'enterprise' ? 6 : 1;
 
         if (currentUsers.length >= maxUsers) {
             alert("Límite de usuarios de su plan alcanzado.");
@@ -211,7 +200,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
         await dbService.addUser({
             name: newCashierName.trim(),
-            pin: '', // Sin PIN
+            pin: '', 
             role: 'cashier'
         });
         setNewCashierName('');
@@ -236,7 +225,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     const handleLoginAttempt = useCallback(async () => {
         if (!selectedUser || pin.length === 0) return;
 
-        // Admin verification
         const loggedInUser = await dbService.verifyPin(selectedUser.id, pin);
         if (loggedInUser) {
             onLoginSuccess(loggedInUser);
@@ -263,17 +251,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     const selectUser = (user: User) => {
         if (user.role === 'cashier') {
-            // LOGIN DIRECTO PARA CAJEROS (Sin PIN)
             soundService.playSound('success');
             onLoginSuccess(user);
         } else {
-            // ADMIN REQUIERE PIN
             setSelectedUser(user);
             soundService.playSound('click');
         }
     }
     
-    // --- SECRET PATTERN ---
     const handleSecretZoneClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -303,14 +288,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
     };
 
-    // --- SETUP MODE (First Run) ---
     if (users.length === 0) {
         const isVerifyingBase = verifyingPlan === 'starter';
         return (
             <div className="dark font-sans relative">
                 {isDevPanelOpen && <DeveloperPanel onClose={() => setIsDevPanelOpen(false)} onRefresh={handleRefreshData} />}
                 
-                {/* --- LICENSE VERIFICATION MODAL --- */}
                 {verifyingPlan && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-modal-in backdrop-blur-sm">
                         <div className={`bg-gray-900 border ${isVerifyingBase ? 'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.2)]' : 'border-dp-gold shadow-[0_0_50px_rgba(212,175,55,0.2)]'} rounded-xl w-full max-w-sm p-6 relative`}>
@@ -383,7 +366,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         </div>
                         
                         <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-left space-y-5 shadow-2xl relative overflow-hidden">
-                            {/* Step 1: Store Name */}
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500 flex items-center gap-2"><Store size={14}/> Nombre del Punto</label>
                                 <input 
@@ -395,7 +377,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                 />
                             </div>
 
-                            {/* Step 2: Industry */}
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500 flex items-center gap-2"><LayoutGrid size={14}/> Rubro / Industria</label>
                                 <div className="grid grid-cols-2 gap-2">
@@ -411,7 +392,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                 </div>
                             </div>
 
-                            {/* Step 3: Plan Selection (With Verification) */}
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500 flex items-center gap-2"><Briefcase size={14}/> Tipo de Licencia</label>
                                 <div className="flex gap-2">
@@ -420,7 +400,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                         {selectedPlan !== 'starter' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
                                     </button>
                                     <button onClick={() => handlePlanClick('pro')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'pro' ? 'bg-purple-600 border-purple-500 text-white ring-2 ring-purple-400' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
-                                        PRO<br/><span className="text-[9px] opacity-70 font-normal">2 Usuarios</span>
+                                        PRO<br/><span className="text-[9px] opacity-70 font-normal">3 Usuarios</span>
                                         {selectedPlan !== 'pro' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
                                     </button>
                                     <button onClick={() => handlePlanClick('enterprise')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'enterprise' ? 'bg-yellow-600 border-yellow-500 text-white ring-2 ring-yellow-400' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
@@ -447,7 +427,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         );
     }
 
-    // --- PIN PAD MODE (Only for Admin) ---
     if (selectedUser) {
         return (
             <div className="dark font-sans">
@@ -495,12 +474,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         );
     }
 
-    // --- USER SELECTION MODE ---
     const storedPlan = localStorage.getItem('dominion_nexus_identity');
     const planData = storedPlan ? JSON.parse(storedPlan).plan : 'starter';
     const canAddCashier = (planData === 'pro' || planData === 'enterprise');
     const currentUsers = users.length;
-    const maxUsersAllowed = planData === 'pro' ? 2 : planData === 'enterprise' ? 6 : 1;
+    // Ajuste: Plan PRO ahora soporta 3 usuarios
+    const maxUsersAllowed = planData === 'pro' ? 3 : planData === 'enterprise' ? 6 : 1;
 
     return (
         <div className="dark font-sans relative">
@@ -516,20 +495,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                             <h1 className="text-xl font-bold tracking-tight text-dp-gold uppercase pointer-events-none">{settings.storeName}</h1>
                         </>
                     ) : (
-                        <h1 className="text-4xl font-black tracking-tight text-dp-gold mb-2 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)] pointer-events-none">DOMINION</h1>
+                        <h1 className="text-4xl font-black tracking-tight text-dp-gold mb-2 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)] pointer-events-none">DOMINION POS</h1>
                     )}
                 </div>
                 
                 <div className="w-full max-w-4xl">
                     <p className="text-center text-gray-500 mb-6 uppercase tracking-widest text-xs font-bold">Seleccione Usuario</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
+                    <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
                         {users.map(user => {
                             const isAdmin = user.role === 'admin';
                             return (
                                 <button 
                                     key={user.id} 
                                     onClick={() => selectUser(user)} 
-                                    className={`group flex flex-col items-center justify-center gap-3 p-6 rounded-xl border transition-all hover:-translate-y-1 shadow-lg relative overflow-hidden h-40
+                                    className={`group flex flex-col items-center justify-center gap-3 p-6 rounded-xl border transition-all hover:-translate-y-1 shadow-lg relative overflow-hidden h-40 w-36 sm:w-48
                                         ${isAdmin 
                                             ? 'bg-gradient-to-b from-gray-800 to-gray-900 border-yellow-900/30 hover:border-dp-gold/50' 
                                             : 'bg-dp-charcoal border-gray-800 hover:border-gray-600'
@@ -542,8 +521,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                             <UserIcon size={32} className="text-gray-400 group-hover:text-white"/>
                                         )}
                                     </div>
-                                    <div className="text-center relative z-10">
-                                        <span className={`block font-bold text-lg transition-colors ${isAdmin ? 'text-yellow-100 group-hover:text-dp-gold' : 'text-gray-300 group-hover:text-white'}`}>
+                                    <div className="text-center relative z-10 w-full">
+                                        <span className={`block font-bold text-lg truncate transition-colors ${isAdmin ? 'text-yellow-100 group-hover:text-dp-gold' : 'text-gray-300 group-hover:text-white'}`}>
                                             {user.name}
                                         </span>
                                     </div>
@@ -551,9 +530,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                             );
                         })}
 
-                        {/* Botón Agregar Caja (Pro y Comercio) */}
                         {canAddCashier && currentUsers < maxUsersAllowed && (
-                            <div className="relative h-40">
+                            <div className="relative h-40 w-36 sm:w-48">
                                 {isAddingCashier ? (
                                     <div className="absolute inset-0 bg-gray-800 border border-gray-600 rounded-xl p-4 flex flex-col justify-center gap-2 animate-modal-in">
                                         <input 

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import * as cloudService from './cloud';
 import * as settingsService from './settings';
@@ -11,27 +10,13 @@ export interface ScannedItem {
   confidence: number;
 }
 
+// Fix: Obtaining API key exclusively from environment variable as per mandatory guidelines.
 const getAIClient = () => {
-  const plan = cloudService.getPlan();
-  let apiKey: string | undefined;
-
-  if (plan === 'starter') {
-      // Free Plan uses the system API Key (Env Var)
-      apiKey = process.env.API_KEY;
-  } else {
-      // Pro/Enterprise uses BYOK from settings
-      const settings = settingsService.getBusinessSettings();
-      apiKey = settings.googleApiKey;
+  if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
+    throw new Error("Fragilidad Crítica: API_KEY del sistema no configurada. Contacte soporte.");
   }
-
-  if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
-    if (plan === 'starter') {
-        throw new Error("Fragilidad Crítica: API_KEY del sistema no configurada. Contacte soporte.");
-    } else {
-        throw new Error("BYOK Requerido: Configure su API Key de Google Gemini en el Panel de Control > Configuración.");
-    }
-  }
-  return new GoogleGenAI({ apiKey });
+  // Fix: Initializing client using direct environment variable reference.
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export async function analyzeInvoiceImage(base64Image: string): Promise<ScannedItem[]> {
@@ -39,6 +24,7 @@ export async function analyzeInvoiceImage(base64Image: string): Promise<ScannedI
     const ai = getAIClient();
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
+    // Fix: Using gemini-3-flash-preview for complex text analysis on images.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
@@ -67,6 +53,7 @@ export async function analyzeInvoiceImage(base64Image: string): Promise<ScannedI
       },
     });
 
+    // Fix: Accessing generated text directly via property as per new API signature.
     const text = response.text;
     if (!text) return [];
     
@@ -76,7 +63,7 @@ export async function analyzeInvoiceImage(base64Image: string): Promise<ScannedI
   } catch (error: any) {
     console.error("AI Service Error:", error);
     if (error.message.includes("API_KEY")) {
-        throw new Error("API_KEY no válida. Verifique su configuración.");
+        throw new Error("Error de autenticación con el servicio de IA.");
     }
     throw error;
   }
@@ -87,6 +74,7 @@ export async function processAudioInventory(base64Audio: string): Promise<Scanne
       const ai = getAIClient();
       const cleanBase64 = base64Audio.includes(',') ? base64Audio.split(',')[1] : base64Audio;
   
+      // Fix: Using recommended model for native audio processing.
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         contents: {
@@ -121,6 +109,7 @@ export async function processAudioInventory(base64Audio: string): Promise<Scanne
         },
       });
   
+      // Fix: Accessing generated text directly via property.
       const text = response.text;
       if (!text) return [];
       return JSON.parse(text) as ScannedItem[];
