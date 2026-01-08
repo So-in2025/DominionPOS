@@ -191,9 +191,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
     };
 
-    // --- QUICK ADD CASHIER (Commerce Plan) ---
+    // --- QUICK ADD CASHIER ---
     const handleQuickAddCashier = async () => {
         if (!newCashierName.trim()) return;
+        
+        const storedPlan = localStorage.getItem('dominion_nexus_identity');
+        const planData = storedPlan ? JSON.parse(storedPlan).plan : 'starter';
+        const currentUsers = dbService.getUsers();
+        const maxUsers = planData === 'pro' ? 2 : planData === 'enterprise' ? 6 : 1;
+
+        if (currentUsers.length >= maxUsers) {
+            alert("Límite de usuarios de su plan alcanzado.");
+            setIsAddingCashier(false);
+            setNewCashierName('');
+            return;
+        }
+
         await dbService.addUser({
             name: newCashierName.trim(),
             pin: '', // Sin PIN
@@ -478,7 +491,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     // --- USER SELECTION MODE ---
     const storedPlan = localStorage.getItem('dominion_nexus_identity');
     const planData = storedPlan ? JSON.parse(storedPlan).plan : 'starter';
-    const canAddCashier = planData === 'enterprise' && users.filter(u => u.role === 'cashier').length < 5;
+    const canAddCashier = (planData === 'pro' || planData === 'enterprise');
+    const currentUsers = users.length;
+    const maxUsersAllowed = planData === 'pro' ? 2 : planData === 'enterprise' ? 6 : 1;
 
     return (
         <div className="dark font-sans relative">
@@ -529,8 +544,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                             );
                         })}
 
-                        {/* Botón Agregar Caja (Solo Comercio) */}
-                        {canAddCashier && (
+                        {/* Botón Agregar Caja (Pro y Comercio) */}
+                        {canAddCashier && currentUsers < maxUsersAllowed && (
                             <div className="relative h-40">
                                 {isAddingCashier ? (
                                     <div className="absolute inset-0 bg-gray-800 border border-gray-600 rounded-xl p-4 flex flex-col justify-center gap-2 animate-modal-in">
@@ -555,6 +570,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                     >
                                         <Plus size={32} />
                                         <span className="text-xs font-bold uppercase">Nueva Caja</span>
+                                        <span className="text-[10px] opacity-50">({currentUsers}/{maxUsersAllowed})</span>
                                     </button>
                                 )}
                             </div>

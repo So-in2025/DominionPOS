@@ -1,6 +1,5 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { getGeminiApiKey } from "./settings";
 
 export interface ScannedItem {
   productName: string;
@@ -11,17 +10,14 @@ export interface ScannedItem {
 }
 
 export async function analyzeInvoiceImage(base64Image: string): Promise<ScannedItem[]> {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-      throw new Error("API Key no configurada. Ve a Configuración > Inteligencia Artificial.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  /* Initializing GoogleGenAI with process.env.API_KEY directly as per guidelines */
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      /* Using 'gemini-3-flash-preview' for vision-based data extraction */
+      model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } },
@@ -62,20 +58,13 @@ export async function analyzeInvoiceImage(base64Image: string): Promise<ScannedI
 
   } catch (error: any) {
     console.error("Error analyzing invoice:", error);
-    if(error.message?.includes("API key")) {
-        throw new Error("API Key inválida. Verifique en Configuración.");
-    }
     throw new Error("No se pudo analizar la imagen. Verifique su conexión.");
   }
 }
 
 export async function processAudioInventory(base64Audio: string): Promise<ScannedItem[]> {
-    const apiKey = getGeminiApiKey();
-    if (!apiKey) {
-        throw new Error("API Key no configurada. Ve a Configuración > Inteligencia Artificial.");
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
+    /* Initializing GoogleGenAI with process.env.API_KEY directly as per guidelines */
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const cleanBase64 = base64Audio.includes(',') ? base64Audio.split(',')[1] : base64Audio;
   
     try {
@@ -140,9 +129,6 @@ export async function processAudioInventory(base64Audio: string): Promise<Scanne
   
     } catch (error: any) {
       console.error("Error processing audio:", error);
-      if(error.message?.includes("API key")) {
-          throw new Error("API Key inválida.");
-      }
       throw new Error("No se pudo procesar el audio.");
     }
   }

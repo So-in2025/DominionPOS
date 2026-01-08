@@ -3,8 +3,7 @@ import type { LoyaltySettings, BusinessSettings } from '../types';
 
 const LOYALTY_SETTINGS_KEY = 'dominion-loyalty-settings';
 const BUSINESS_SETTINGS_KEY = 'dominion-business-settings';
-const GEMINI_API_KEY_STORAGE = 'dominion-gemini-api-key';
-const VENDOR_WHATSAPP_KEY = 'dominion-vendor-wa'; // New key for dynamic sales number
+const VENDOR_WHATSAPP_KEY = 'dominion-vendor-wa';
 
 const LOYALTY_DEFAULTS: LoyaltySettings = {
   pointsPerDollar: 1,
@@ -62,27 +61,14 @@ export function saveBusinessSettings(settings: BusinessSettings) {
   }
 }
 
-// --- BYOK Logic ---
-
-export function getGeminiApiKey(): string | null {
-  // Prioriza la clave guardada por el usuario (BYOK), fallback a env si existe para dev
-  return localStorage.getItem(GEMINI_API_KEY_STORAGE) || (typeof process !== 'undefined' && process.env ? process.env.API_KEY : null) || null;
-}
-
-export function saveGeminiApiKey(key: string) {
-  if (!key) {
-    localStorage.removeItem(GEMINI_API_KEY_STORAGE);
-  } else {
-    localStorage.setItem(GEMINI_API_KEY_STORAGE, key.trim());
-  }
-}
+/* Removed Gemini API Key storage functions as per coding guidelines */
 
 // --- Vendor Configuration (Dynamic WhatsApp) ---
 
 export function getVendorWhatsApp(): string {
-    return localStorage.getItem(VENDOR_WHATSAPP_KEY) || '5491100000000'; // Default placeholder
+    return localStorage.getItem(VENDOR_WHATSAPP_KEY) || '5491100000000';
 }
 
 export function saveVendorWhatsApp(number: string) {
-    localStorage.setItem(VENDOR_WHATSAPP_KEY, number.replace(/[^0-9]/g, '')); // Store only digits
+    localStorage.setItem(VENDOR_WHATSAPP_KEY, number.replace(/[^0-9]/g, ''));
 }
