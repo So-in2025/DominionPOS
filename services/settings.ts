@@ -107,10 +107,11 @@ export function incrementFreeQuota(type: 'image' | 'voice') {
 
 export function getVendorWhatsApp(): string {
     // Ahora obtenemos el número directamente del Nexus (Registro Global)
+    // Esto asegura que todos los clientes vean el número actualizado por el desarrollador
     return cloudService.getGlobalNexusConfig().vendorWhatsApp;
 }
 
 export function saveVendorWhatsApp(number: string) {
-    // Ahora guardamos en el Nexus (Registro Global)
+    // Guardamos en el Nexus (Registro Global)
     cloudService.saveGlobalNexusConfig({ vendorWhatsApp: number.replace(/[^0-9]/g, '') });
 }

@@ -56,7 +56,7 @@ export function getGlobalNexusConfig(): GlobalNexusConfig {
 export function saveGlobalNexusConfig(config: Partial<GlobalNexusConfig>) {
     const current = getGlobalNexusConfig();
     localStorage.setItem(GLOBAL_CONFIG_KEY, JSON.stringify({ ...current, ...config }));
-    // Disparar evento para que otros componentes en la misma pestaña (simulando otros nodos) se enteren
+    // Disparar evento para que otros componentes en la misma pestaña (simulando otros nodos) se enteren inmediatamente
     window.dispatchEvent(new Event('dominion_global_config_update'));
 }
 
