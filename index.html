@@ -1,0 +1,122 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>DOMINION POS</title>
+    <meta name="description" content="Sistema de Punto de Venta moderno.">
+    <meta name="theme-color" content="#000000">
+    
+    <!-- PWA / Mobile Web App Capability -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DOMINION POS">
+    <meta name="format-detection" content="telephone=no">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS (CDN Fallback/Preview) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              'sans': ['Inter', 'sans-serif'],
+              'mono': ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+            },
+            keyframes: {
+              'fade-in-out': {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              'modal-in': {
+                '0%': { opacity: '0', transform: 'translateY(-10px) scale(0.98)' },
+                '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+              },
+              'shimmer': {
+                '100%': { transform: 'translateX(100%)' },
+              },
+              'list-item-in': {
+                '0%': { opacity: '0', transform: 'translateX(-20px)' },
+                '100%': { opacity: '1', transform: 'translateX(0)' },
+              },
+              'flash-total-price': {
+                'from': { color: '#D4AF37', transform: 'scale(1.1)' },
+                'to': { color: 'inherit', transform: 'scale(1)' },
+              },
+              'slide-in-from-right': {
+                '0%': { transform: 'translateX(100%)' },
+                '100%': { transform: 'translateX(0)' },
+              },
+              'pulse-glow': {
+                '0%, 100%': { boxShadow: '0 0 5px rgba(212, 175, 55, 0.5)' },
+                '50%': { boxShadow: '0 0 20px rgba(212, 175, 55, 0.8)' },
+              },
+              'shake': {
+                '0%, 100%': { transform: 'translateX(0)' },
+                '25%': { transform: 'translateX(-5px)' },
+                '75%': { transform: 'translateX(5px)' },
+              }
+            },
+            animation: {
+              'fade-in-out': 'fade-in-out 0.5s ease-out forwards',
+              'modal-in': 'modal-in 0.2s ease-out forwards',
+              'shimmer': 'shimmer 1.5s infinite linear',
+              'list-item-in': 'list-item-in 0.3s ease-out forwards',
+              'flash-total-price': 'flash-total-price 0.5s ease-out',
+              'slide-in-from-right': 'slide-in-from-right 0.3s ease-out forwards',
+              'pulse-glow': 'pulse-glow 2s infinite',
+              'shake': 'shake 0.3s ease-in-out',
+            },
+            colors: {
+              'dp-dark': '#000000',
+              'dp-gold': '#D4AF37',
+              'dp-charcoal': '#1f2937', 
+              'dp-light-gray': '#d1d5db',
+              'dp-light': '#FFFFFF',
+              'dp-blue': '#0056B3',
+              'dp-soft-gray': '#f3f4f6', 
+              'dp-dark-gray': '#111827'
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- Import Map for ESM usage in browser -->
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@^18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@^0.344.0",
+    "idb": "https://esm.sh/idb@^8.0.0",
+    "date-fns": "https://esm.sh/date-fns@^3.3.1",
+    "react-chartjs-2": "https://esm.sh/react-chartjs-2@^5.2.0",
+    "chart.js": "https://esm.sh/chart.js@^4.4.1",
+    "@google/genai": "https://esm.sh/@google/genai@^0.1.1",
+    "firebase/app": "https://esm.sh/firebase@^10.8.0/app",
+    "firebase/firestore": "https://esm.sh/firebase@^10.8.0/firestore",
+    "firebase/auth": "https://esm.sh/firebase@^10.8.0/auth",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="antialiased bg-black select-none">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "DOMINION POS",
+  "description": "Un sistema de Punto de Venta (POS) de alta gama, con enfoque 'local-first'. Fase XIV (Voice Ingestion): 100% completado. Soporte para dictado de inventario.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
