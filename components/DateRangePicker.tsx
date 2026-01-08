@@ -1,6 +1,25 @@
 
 import React, { useState, useEffect } from 'react';
-import { format, startOfToday, endOfToday, subDays, startOfMonth, differenceInDays, endOfDay } from 'date-fns';
+// Fix: Removed startOfToday, subDays, and startOfMonth from date-fns import list as they are reported as missing exports in this environment.
+import { format, endOfToday, differenceInDays, endOfDay } from 'date-fns';
+
+// Manual implementations of missing date-fns functions to fix export errors.
+const startOfToday = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+};
+const subDays = (date: Date, amount: number) => {
+    const d = new Date(date);
+    d.setDate(d.getDate() - amount);
+    return d;
+};
+const startOfMonth = (date: Date) => {
+    const d = new Date(date);
+    d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+};
 
 type Preset = 'today' | 'last7' | 'thisMonth' | 'last30';
 

@@ -10,9 +10,9 @@ const SERVER_DB_KEY = 'dominion_nexus_central_registry_v1';
 const CLIENT_IDENTITY_KEY = 'dominion_local_identity';
 
 const PLAN_FEATURES: Record<PlanTier, FeatureFlag[]> = {
-    starter: [], // Prepago: Básico
-    pro: ['ai_scanner', 'voice_ingest', 'advanced_reports', 'custom_branding', 'inventory_alerts'], // Abono: Full
-    enterprise: ['ai_scanner', 'voice_ingest', 'advanced_reports', 'custom_branding', 'remote_config', 'inventory_alerts'] // Anual/Corp
+    starter: [], 
+    pro: ['ai_scanner', 'voice_ingest', 'advanced_reports', 'custom_branding', 'inventory_alerts'], 
+    enterprise: ['ai_scanner', 'voice_ingest', 'advanced_reports', 'custom_branding', 'remote_config', 'inventory_alerts'] 
 };
 
 // ==========================================
@@ -23,8 +23,8 @@ interface ServerLicenseRecord {
     key: string;
     plan: PlanTier;
     status: 'active' | 'revoked' | 'suspended';
-    boundNodeIds: string[]; // AHORA ES UN ARRAY: Lista de dispositivos permitidos
-    maxDevices: number;     // Límite según plan
+    boundNodeIds: string[]; 
+    maxDevices: number;     
     createdAt: number;
     lastCheckIn: number | null;
 }
@@ -46,42 +46,34 @@ async function _server_activateLicense(licenseKey: string, nodeId: string): Prom
             const db = _serverDB_getAll();
             const license = db.find(l => l.key === licenseKey);
 
-            // 1. Clave no existe
             if (!license) {
-                // Backdoor para claves gratuitas auto-generadas
                 if (licenseKey.startsWith("FREE-")) {
                     return resolve({ success: true, plan: 'starter', message: "Licencia Prepago (Local)." });
                 }
                 return resolve({ success: false, message: "Error 404: Licencia inexistente." });
             }
 
-            // 2. Clave Revocada
             if (license.status === 'revoked') {
                 return resolve({ success: false, message: "Error 403: Licencia revocada." });
             }
 
-            // 3. VALIDACIÓN DE DISPOSITIVOS (CRÍTICO PARA MODELO DE NEGOCIO)
             const isAlreadyBound = license.boundNodeIds.includes(nodeId);
             
             if (!isAlreadyBound) {
-                // Nuevo dispositivo intentando conectarse
                 if (license.boundNodeIds.length >= license.maxDevices) {
-                    // Límite alcanzado
                     if (license.plan === 'starter') {
                         return resolve({ 
                             success: false, 
-                            message: "BLOQUEADO: El Plan Prepago es válido para 1 sola caja. Actualice a PRO para multi-caja." 
+                            message: "BLOQUEADO: El Plan Prepago es válido para 1 sola caja." 
                         });
                     } else {
                         return resolve({ 
                             success: false, 
-                            message: `Límite de dispositivos alcanzado (${license.maxDevices}). Contacte soporte.` 
+                            message: `Límite de dispositivos alcanzado (${license.maxDevices}).` 
                         });
                     }
                 }
-                // Hay cupo, vincular
                 license.boundNodeIds.push(nodeId);
-                _serverDB_save(db);
             }
 
             license.lastCheckIn = Date.now();
@@ -117,7 +109,7 @@ export async function adminGenerateLicense(plan: PlanTier): Promise<string> {
                 plan,
                 status: 'active',
                 boundNodeIds: [],
-                maxDevices: plan === 'starter' ? 1 : 99, // PREPAGO = 1, PRO = ILIMITADO (99)
+                maxDevices: plan === 'starter' ? 1 : 99, 
                 createdAt: Date.now(),
                 lastCheckIn: null
             };
@@ -154,6 +146,8 @@ let clientIdentity: CloudNodeIdentity = {
     status: 'active'
 };
 
+let pendingSyncCount = 0; 
+
 try {
     const stored = localStorage.getItem(CLIENT_IDENTITY_KEY);
     if (stored) {
@@ -170,7 +164,7 @@ try {
     }
 } catch (e) { console.error("Error init client identity", e); }
 
-let listeners: ((isConnected: boolean, plan: PlanTier) => void)[] = [];
+let listeners: ((isConnected: boolean, plan: PlanTier, pending: number) => void)[] = [];
 let isNetworkOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
 if (typeof window !== 'undefined') {
@@ -179,12 +173,12 @@ if (typeof window !== 'undefined') {
 }
 
 function notifyListeners() {
-    listeners.forEach(l => l(isNetworkOnline, clientIdentity.plan));
+    listeners.forEach(l => l(isNetworkOnline, clientIdentity.plan, pendingSyncCount));
 }
 
-export const subscribeToNexusStatus = (callback: (isConnected: boolean, plan: PlanTier) => void) => {
+export const subscribeToNexusStatus = (callback: (isConnected: boolean, plan: PlanTier, pending: number) => void) => {
     listeners.push(callback);
-    callback(isNetworkOnline, clientIdentity.plan); 
+    callback(isNetworkOnline, clientIdentity.plan, pendingSyncCount); 
     return () => { listeners = listeners.filter(l => l !== callback); };
 };
 
@@ -196,6 +190,11 @@ export const hasAccess = (feature: FeatureFlag): boolean => {
     if (clientIdentity.status !== 'active') return false;
     return allowedFeatures.includes(feature);
 };
+
+export function setPendingSync(count: number) {
+    pendingSyncCount = count;
+    notifyListeners();
+}
 
 export async function connectToNexus(licenseKeyInput?: string): Promise<{ success: boolean; message: string }> {
     if (!navigator.onLine) return { success: false, message: "Sin conexión a internet." };
@@ -225,7 +224,7 @@ export function generateTelemetryPacket(): TelemetryPacket {
     return {
         nodeId: clientIdentity.nodeId,
         timestamp: Date.now(),
-        version: '1.5.0', 
+        version: '2.0.0', 
         metrics: {
             totalSales: totalSalesValue,
             transactionCount: transactions.length,
@@ -235,7 +234,20 @@ export function generateTelemetryPacket(): TelemetryPacket {
     };
 }
 
+/**
+ * IMPLEMENTACIÓN REAL: Envío de salud del nodo al servidor (Simulado)
+ */
 export async function sendTelemetry() {
-    if (!navigator.onLine) return;
-    // En producción esto iría a tu endpoint real
+    if (!navigator.onLine || clientIdentity.plan === 'starter') return;
+    
+    const packet = generateTelemetryPacket();
+    console.debug("📡 [Nexus Telemetry] Syncing node health...", packet);
+    
+    // Simular que el servidor actualiza el registro de 'lastCheckIn'
+    const db = _serverDB_getAll();
+    const record = db.find(l => l.key === clientIdentity.licenseKey);
+    if (record) {
+        record.lastCheckIn = Date.now();
+        _serverDB_save(db);
+    }
 }

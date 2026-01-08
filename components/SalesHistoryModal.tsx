@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Transaction } from '../types';
 import * as dbService from '../services/db';
-import { X, ChevronDown, ChevronUp, DollarSign, CreditCard, User, RotateCcw, TrendingUp, Gift, Printer } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, DollarSign, CreditCard, User, RotateCcw, TrendingUp, Gift, Printer, Search, Calendar } from 'lucide-react';
 import { PROMOTIONS } from '../constants';
 
 interface SalesHistoryModalProps {
@@ -14,149 +14,119 @@ interface SalesHistoryModalProps {
 const SalesHistoryModal: React.FC<SalesHistoryModalProps> = ({ onClose, onReturn, onPrintReceipt }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     setTransactions(dbService.getTransactions());
   }, []);
 
+  const filteredTxs = transactions.filter(tx => 
+      tx.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      tx.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div
-      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center"
-      aria-modal="true"
-      role="dialog"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-dp-light dark:bg-dp-charcoal rounded-lg shadow-2xl p-6 w-full max-w-2xl m-4 flex flex-col max-h-[80vh] animate-modal-in" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-dp-dark-gray dark:text-dp-light-gray">Historial de Ventas</h2>
-            <button
-                onClick={onClose}
-                className="p-2 rounded-full text-dp-dark-gray dark:text-dp-light-gray hover:bg-dp-soft-gray dark:hover:bg-gray-700"
-                aria-label="Cerrar"
-            >
-                <X size={24} />
-            </button>
-        </div>
+    <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-dp-dark rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-modal-in flex flex-col max-h-[90vh] border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
         
-        <div className="flex-grow overflow-y-auto pr-2">
-          {transactions.length === 0 ? (
-            <p className="text-center text-gray-500 dark:text-gray-400 mt-10">No hay ventas registradas.</p>
-          ) : (
-            <ul className="space-y-2">
-              {transactions.map((tx) => (
-                <li key={tx.id} className="rounded-md bg-dp-soft-gray dark:bg-gray-800/50 transition-shadow shadow-sm">
-                  <div className="flex justify-between items-center p-3 text-left">
-                    <div className="flex items-center gap-3">
-                        {tx.type === 'refund' 
-                            ? <div className="p-2 rounded-full bg-orange-500/10 text-orange-500"><RotateCcw size={20}/></div>
-                            : <div className="p-2 rounded-full bg-green-500/10 text-green-500"><TrendingUp size={20}/></div>
-                        }
-                        <div className="flex-1">
-                          <p className={`font-semibold text-sm ${tx.type === 'refund' ? 'text-orange-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {tx.type === 'refund' ? 'Reembolso a Venta' : 'ID:'} {tx.type === 'refund' ? tx.originalTransactionId : tx.id}
-                          </p>
-                          <p className="text-gray-800 dark:text-gray-200">{new Date(tx.createdAt).toLocaleString()}</p>
-                        </div>
-                    </div>
-                    <div className="text-right mx-4">
-                      <p className={`font-bold text-lg ${tx.type === 'refund' ? 'text-orange-400' : 'text-dp-blue dark:text-dp-gold'}`}>
-                        {tx.total < 0 && '-'}${Math.abs(tx.total).toFixed(2)}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{tx.items.length} {tx.items.length === 1 ? 'artículo' : 'artículos'}</p>
-                    </div>
-                    <button 
-                        className="text-gray-500 dark:text-gray-400 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                        onClick={() => setExpandedTxId(expandedTxId === tx.id ? null : tx.id)}
-                    >
-                      {expandedTxId === tx.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                    </button>
-                  </div>
-                  {expandedTxId === tx.id && (
-                    <div id={`tx-details-${tx.id}`} className="px-4 pb-3 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-semibold text-md my-2 text-dp-dark-gray dark:text-dp-light-gray">Detalles de la Transacción:</h4>
-                        {tx.type === 'sale' && (
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => onPrintReceipt(tx)} className="flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-semibold transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-900/50 dark:text-gray-300 dark:hover:bg-gray-900/80">
-                                    <Printer size={14} />
-                                </button>
-                                <button onClick={() => onReturn(tx)} className="flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-semibold transition-colors bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:hover:bg-orange-900/80">
-                                    <RotateCcw size={14} /> Reembolsar
-                                </button>
-                            </div>
-                        )}
-                      </div>
-                      <ul className="space-y-1 mb-3 text-sm">
-                        {tx.items.map(item => {
-                           const effectivePrice = item.overriddenPrice ?? item.price;
-                           const lineTotal = effectivePrice * item.quantity;
-                           let discountedTotal = lineTotal;
-                            if(item.discount && tx.type === 'sale') { // Discounts only apply to sales
-                                if(item.discount.type === 'percentage') {
-                                    discountedTotal = lineTotal * (1 - item.discount.value / 100);
-                                } else {
-                                    discountedTotal = Math.max(0, lineTotal - item.discount.value);
-                                }
-                            }
-                          return (
-                          <li key={item.id} className="flex justify-between items-center text-gray-700 dark:text-gray-300">
-                            <span>{item.name} <span className="text-gray-500 dark:text-gray-400">x{item.quantity}</span> 
-                            {item.overriddenPrice && <s className="ml-1 text-gray-400">(${item.price.toFixed(2)})</s>}
-                            {item.discount && <span className="text-red-500 font-semibold ml-1">({item.discount.type === 'percentage' ? `${item.discount.value}%` : `-$${item.discount.value.toFixed(2)}`})</span>}
-                            </span>
-                            <span>${discountedTotal.toFixed(2)}</span>
-                          </li>
-                        )})}
-                      </ul>
-                      {tx.type === 'sale' && (
-                       <div className="border-t border-gray-300 dark:border-gray-600 pt-2 text-sm font-medium space-y-1">
-                          <div className="flex justify-between text-gray-600 dark:text-gray-400"><span>Subtotal:</span><span>${tx.subtotal.toFixed(2)}</span></div>
-                          {tx.discountAmount > 0 && <div className="flex justify-between text-red-600 dark:text-red-400"><span>Descuento Total {tx.globalDiscount && `(${tx.globalDiscount.type === 'percentage' ? `${tx.globalDiscount.value}%` : `-$${tx.globalDiscount.value.toFixed(2)}`})`}:</span><span>-${tx.discountAmount.toFixed(2)}</span></div>}
-                          {tx.activePromotion && <div className="flex justify-between text-green-600 dark:text-green-400"><span><Gift size={14} className="inline mr-1"/>Promoción:</span><span className="font-semibold">{PROMOTIONS.find(p=>p.id === tx.activePromotion)?.name}</span></div>}
-                          <div className="flex justify-between font-bold text-base text-dp-dark-gray dark:text-dp-light-gray pt-1 border-t border-gray-300 dark:border-gray-600 mt-1"><span>Total:</span><span>${tx.total.toFixed(2)}</span></div>
-                      </div>
-                      )}
-                      <div className="border-t border-gray-300 dark:border-gray-600 pt-2 text-sm mt-2">
-                         {tx.customerName && (
-                           <div className="flex items-center justify-between mb-1">
-                             <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400"><User size={16} />Cliente:</span>
-                             <span className="font-semibold">{tx.customerName}</span>
-                           </div>
-                         )}
-                         <div className="flex items-center justify-between">
-                           <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400">{tx.paymentMethod === 'Efectivo' ? <DollarSign size={16} /> : tx.paymentMethod === 'Tarjeta' ? <CreditCard size={16} /> : <RotateCcw size={16}/>}Método:</span>
-                           <span className="font-semibold">{tx.paymentMethod}</span>
-                         </div>
-                         {tx.paymentMethod === 'Efectivo' && (
-                           <>
-                            <div className="flex items-center justify-between mt-1"><span className="text-gray-600 dark:text-gray-400">Recibido:</span><span className="font-semibold">${tx.amountReceived?.toFixed(2) ?? 'N/A'}</span></div>
-                            <div className="flex items-center justify-between mt-1"><span className="text-gray-600 dark:text-gray-400">Cambio:</span><span className="font-semibold">${tx.change?.toFixed(2) ?? 'N/A'}</span></div>
-                           </>
-                         )}
-                      </div>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+        {/* Header Section */}
+        <div className="p-6 bg-dp-soft-gray dark:bg-black/40 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start">
+            <div>
+                <h2 className="text-2xl font-black text-dp-dark-gray dark:text-dp-light-gray flex items-center gap-3">
+                   <TrendingUp className="text-dp-blue dark:text-dp-gold"/> Auditoría de Ventas
+                </h2>
+                <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mt-1">Registro histórico de transacciones</p>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full transition-colors"><X size={24} /></button>
         </div>
 
-        <div className="mt-6 flex justify-end">
-             <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-md text-sm font-semibold transition-colors
-                         bg-gray-200 text-gray-800 hover:bg-gray-300
-                         dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600
-                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
-                         dark:focus:ring-offset-dp-charcoal"
-            >
-              Cerrar
-            </button>
+        {/* Filter Bar */}
+        <div className="px-6 py-4 bg-white dark:bg-dp-dark border-b border-gray-100 dark:border-gray-800">
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                    type="text" 
+                    placeholder="Buscar por ID de venta o nombre de cliente..." 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-black/40 outline-none focus:ring-2 focus:ring-dp-blue transition-all text-sm"
+                />
+            </div>
+        </div>
+        
+        {/* List Section */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+          {filteredTxs.length === 0 ? (
+            <div className="h-64 flex flex-col items-center justify-center opacity-30 grayscale">
+                <Search size={48} className="mb-2"/>
+                <p className="text-xs font-black uppercase tracking-widest">Sin resultados</p>
+            </div>
+          ) : (
+            filteredTxs.map((tx) => (
+                <div key={tx.id} className="bg-white dark:bg-dp-charcoal rounded-2xl shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all overflow-hidden">
+                    <button 
+                        onClick={() => setExpandedTxId(expandedTxId === tx.id ? null : tx.id)}
+                        className="w-full p-4 flex items-center justify-between group"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-xl ${tx.type === 'refund' ? 'bg-red-50 text-red-500 dark:bg-red-900/30' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30'}`}>
+                                {tx.type === 'refund' ? <RotateCcw size={20}/> : <DollarSign size={20}/>}
+                            </div>
+                            <div className="text-left">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{tx.id.slice(-6)}</span>
+                                    {tx.customerName && <span className="px-2 py-0.5 rounded-full bg-dp-blue/10 text-dp-blue dark:text-dp-gold dark:bg-dp-gold/10 text-[9px] font-black uppercase">{tx.customerName}</span>}
+                                </div>
+                                <p className="text-xs font-bold text-gray-800 dark:text-gray-200 mt-0.5">{new Date(tx.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <p className={`text-lg font-black ${tx.type === 'refund' ? 'text-red-500' : 'text-dp-blue dark:text-dp-gold'}`}>
+                                    {tx.total < 0 ? '-' : ''}${Math.abs(tx.total).toLocaleString()}
+                                </p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{tx.items.length} Artículos • {tx.paymentMethod}</p>
+                            </div>
+                            <div className={`p-1.5 rounded-lg bg-gray-100 dark:bg-black/30 text-gray-400 group-hover:text-dp-blue transition-colors ${expandedTxId === tx.id ? 'rotate-180' : ''}`}>
+                                <ChevronDown size={18} />
+                            </div>
+                        </div>
+                    </button>
+                    
+                    {expandedTxId === tx.id && (
+                        <div className="px-6 pb-6 pt-2 animate-modal-in border-t border-gray-50 dark:border-gray-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Desglose de Operación</h4>
+                                <div className="flex gap-2">
+                                    <button onClick={() => onPrintReceipt(tx)} className="p-2 rounded-lg bg-gray-100 dark:bg-black/40 text-gray-500 hover:text-dp-blue transition-colors" title="Reimprimir Ticket"><Printer size={16}/></button>
+                                    {tx.type === 'sale' && (
+                                        <button onClick={() => onReturn(tx)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-black uppercase tracking-widest transition-all">Reembolsar</button>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <ul className="space-y-2 mb-6">
+                                {tx.items.map(item => (
+                                    <li key={item.id} className="flex justify-between items-center text-xs">
+                                        <div className="flex-1">
+                                            <p className="font-bold text-gray-700 dark:text-gray-300">{item.name}</p>
+                                            <p className="text-[10px] text-gray-500">x{item.quantity} @ ${item.price.toLocaleString()}</p>
+                                        </div>
+                                        <p className="font-mono font-bold text-gray-600 dark:text-gray-400">${((item.overriddenPrice ?? item.price) * item.quantity).toLocaleString()}</p>
+                                    </li>
+                                ))}
+                            </ul>
+
+                            <div className="bg-gray-50 dark:bg-black/30 p-4 rounded-xl space-y-2">
+                                <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase"><span>Subtotal:</span><span>${tx.subtotal.toLocaleString()}</span></div>
+                                {tx.discountAmount > 0 && <div className="flex justify-between text-[10px] font-bold text-red-500 uppercase"><span>Descuentos:</span><span>-${tx.discountAmount.toLocaleString()}</span></div>}
+                                <div className="flex justify-between text-base font-black text-dp-dark-gray dark:text-white pt-2 border-t border-gray-200 dark:border-gray-800"><span>TOTAL NETO:</span><span>${tx.total.toLocaleString()}</span></div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ))
+          )}
         </div>
       </div>
     </div>

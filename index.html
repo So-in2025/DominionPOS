@@ -90,6 +90,32 @@
       }
     </script>
 
+    <style>
+        /* Optimización de Renderizado para dispositivos móviles */
+        .backdrop-blur-sm {
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+            transform: translateZ(0); /* Hardware Acceleration */
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3);
+            border-radius: 10px;
+        }
+        
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
+    </style>
+
     <!-- Import Map for browser -->
     <script type="importmap">
 {
@@ -116,7 +142,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="antialiased bg-black select-none">
+<body class="antialiased bg-black select-none overflow-hidden">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 <script type="module" src="/index.tsx"></script>

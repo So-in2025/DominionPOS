@@ -1,7 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-/* Added Database to imports; removed Eye, EyeOff, ExternalLink, Sparkles, Copy as they were only used in the removed AI section */
-import { X, Download, Upload, Store, Image as ImageIcon, BrainCircuit, CloudLightning, Signal, Lock, Smartphone, CheckCircle, Crown, Users, UserMinus, ShieldCheck, User as UserIcon, Plus, Info, Database } from 'lucide-react';
+import { X, Download, Upload, Store, Image as ImageIcon, BrainCircuit, CloudLightning, Signal, Lock, Smartphone, CheckCircle, Crown, Users, UserMinus, ShieldCheck, User as UserIcon, Plus, Info, Database, Loader2 } from 'lucide-react';
 import * as dbService from '../services/db';
 import * as settingsService from '../services/settings';
 import * as cloudService from '../services/cloud';
@@ -18,24 +17,22 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess, onSettingsSaved }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  
   const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(settingsService.getLoyaltySettings());
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(settingsService.getBusinessSettings());
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
   
-  // New User State
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'cashier'>('cashier');
   
-  // Nexus Cloud State
   const [nexusKey, setNexusKey] = useState('');
   const [currentIdentity, setCurrentIdentity] = useState<CloudNodeIdentity | null>(null);
   const [nexusStatus, setNexusStatus] = useState<{connecting: boolean, msg: string, type: 'success' | 'error' | 'neutral'}>({connecting: false, msg: '', type: 'neutral'});
   
-  /* Removed API Key states as per Google GenAI guidelines */
-  
-  // User Management State
   const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
@@ -45,11 +42,53 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
       if (identity.licenseKey && !identity.licenseKey.startsWith('FREE-')) {
           setNexusKey(identity.licenseKey);
       }
-      /* Removed loading of Gemini API key from local storage */
   }, []);
 
   const refreshUsers = () => {
       setUsers(dbService.getUsers());
+  };
+
+  const handleExport = async () => {
+      soundService.playSound('click');
+      const data = await dbService.exportDatabase();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `dominion-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      dbService.logAction('DB_EXPORTED', 'Backup manual descargado por el usuario', 'info');
+  };
+
+  const handleImportClick = () => {
+      importInputRef.current?.click();
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!window.confirm("¿IMPORTAR BACKUP? Esta acción reemplazará TODOS los datos actuales. No se puede deshacer.")) {
+          return;
+      }
+
+      setIsProcessingFile(true);
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+          try {
+              const content = ev.target?.result as string;
+              await dbService.importDatabase(content);
+              soundService.playSound('hero');
+              onImportSuccess();
+          } catch (err: any) {
+              alert(`Error fatal de importación: ${err.message}`);
+              soundService.playSound('error');
+          } finally {
+              setIsProcessingFile(false);
+          }
+      };
+      reader.readAsText(file);
   };
 
   const handleAddUser = async () => {
@@ -121,7 +160,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
   const handleSaveAllSettings = () => {
       settingsService.saveLoyaltySettings(loyaltySettings);
       settingsService.saveBusinessSettings(businessSettings);
-      /* Removed saving of Gemini API key to local storage */
       onSettingsSaved();
   };
 
@@ -161,7 +199,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
     <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center backdrop-blur-sm" aria-modal="true" role="dialog" onClick={onClose}>
       <div className="bg-dp-soft-gray dark:bg-dp-dark rounded-2xl shadow-2xl p-0 w-full max-w-2xl m-4 animate-modal-in overflow-hidden max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         
-        {/* Modern Header */}
         <div className="bg-white dark:bg-dp-charcoal px-6 py-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
             <div>
                 <h2 className="text-2xl font-black text-dp-dark-gray dark:text-dp-light-gray tracking-tight">Panel de Control</h2>
@@ -172,7 +209,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           
-          {/* Tarjeta 1: NEXUS CONNECTION */}
           <div className="p-6 rounded-2xl bg-gradient-to-br from-dp-dark-gray to-black text-white shadow-xl relative group overflow-hidden border border-gray-700/50">
              <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-110 transition-transform duration-700"><CloudLightning size={200} /></div>
              <div className="flex justify-between items-start mb-6 relative z-10">
@@ -199,7 +235,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
              {nexusStatus.msg && <p className={`text-xs mt-3 font-bold px-1 flex items-center gap-1 ${nexusStatus.type === 'error' ? 'text-red-400' : 'text-green-400'}`}><Info size={12}/> {nexusStatus.msg}</p>}
           </div>
 
-          {/* Tarjeta 2: TEAM MANAGEMENT */}
           <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <div>
@@ -277,7 +312,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
             </div>
           </section>
 
-          {/* Tarjeta 3: BUSINESS SETTINGS */}
           <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <div>
@@ -359,31 +393,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
             </div>
           </section>
 
-          {/* Tarjeta 4: DATA MANAGEMENT */}
           <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm">
               <h3 className="text-lg font-black flex items-center gap-2 text-dp-dark-gray dark:text-dp-light-gray mb-6"><Database size={20} className="text-dp-blue dark:text-dp-gold"/> Mantenimiento de Datos</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <button 
-                    onClick={() => {}} 
+                    onClick={handleExport} 
                     className="p-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-3 hover:border-dp-blue dark:hover:border-dp-gold hover:bg-gray-50 dark:hover:bg-white/5 transition-all group"
                   >
                     <Download size={24} className="text-dp-blue group-hover:scale-110 transition-transform"/>
                     <span className="text-xs font-black text-dp-dark-gray dark:text-dp-light-gray uppercase tracking-widest">Exportar Base de Datos</span>
                   </button>
                   <button 
-                    onClick={() => {}} 
-                    className="p-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-3 hover:border-red-500 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all group"
+                    onClick={handleImportClick}
+                    disabled={isProcessingFile}
+                    className="p-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-3 hover:border-red-500 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all group disabled:opacity-50"
                   >
-                    <Upload size={24} className="text-red-500 group-hover:scale-110 transition-transform"/>
+                    {isProcessingFile ? <Loader2 className="animate-spin text-red-500" size={24}/> : <Upload size={24} className="text-red-500 group-hover:scale-110 transition-transform"/>}
                     <span className="text-xs font-black text-dp-dark-gray dark:text-dp-light-gray uppercase tracking-widest">Importar Backup</span>
                   </button>
+                  <input type="file" ref={importInputRef} accept=".json" onChange={handleFileImport} className="hidden" />
               </div>
               <button onClick={() => setIsAuditModalOpen(true)} className="w-full mt-6 py-3 text-gray-400 text-[10px] uppercase font-black tracking-[0.2em] hover:text-dp-dark-gray dark:hover:text-white transition-all text-center border-t border-gray-100 dark:border-gray-800 pt-6">Ver Registro de Auditoría Local</button>
           </section>
 
         </div>
 
-        {/* Action Bar Footer */}
         <div className="p-6 bg-white dark:bg-dp-charcoal border-t border-gray-200 dark:border-gray-700 flex gap-4">
             <button onClick={handleSaveAllSettings} className="flex-1 flex justify-center items-center gap-3 px-6 py-4 rounded-2xl text-lg font-black bg-green-600 text-white hover:bg-green-700 shadow-xl shadow-green-500/20 transition-all active:scale-[0.98] uppercase tracking-wider"><CheckCircle size={24} /> Guardar Configuración</button>
         </div>

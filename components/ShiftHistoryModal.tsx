@@ -9,11 +9,14 @@ interface ShiftHistoryModalProps {
 }
 
 const denominations = [
-    { value: 100, label: '$100' }, { value: 50, label: '$50' },
-    { value: 20, label: '$20' }, { value: 10, label: '$10' },
-    { value: 5, label: '$5' }, { value: 1, label: '$1' },
-    { value: 0.25, label: '25¢' }, { value: 0.10, label: '10¢' },
-    { value: 0.05, label: '5¢' }, { value: 0.01, label: '1¢' },
+    { value: 20000, label: '$20.000' },
+    { value: 10000, label: '$10.000' },
+    { value: 2000, label: '$2.000' },
+    { value: 1000, label: '$1.000' },
+    { value: 500, label: '$500' },
+    { value: 200, label: '$200' },
+    { value: 100, label: '$100' },
+    { value: 50, label: '$50' },
 ];
 
 const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
@@ -31,7 +34,7 @@ const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
     const color = variance > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400';
     const prefix = variance > 0 ? '+' : '-';
     const label = variance > 0 ? 'Sobrante' : 'Faltante';
-    return <span className={`font-bold ${color}`}>{prefix}${Math.abs(variance).toFixed(2)} ({label})</span>
+    return <span className={`font-bold ${color}`}>{prefix}${Math.abs(variance).toLocaleString()} ({label})</span>
   };
 
   return (
@@ -72,7 +75,7 @@ const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
                         <p className="text-sm text-gray-500 dark:text-gray-400">ID: {s.id}</p>
                     </div>
                     <div className="text-right mx-4">
-                      <p className="font-bold text-lg text-dp-blue dark:text-dp-gold">${s.totalSales.toFixed(2)}</p>
+                      <p className="font-bold text-lg text-dp-blue dark:text-dp-gold">${s.totalSales.toLocaleString()}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Ventas Totales</p>
                     </div>
                      <div className="text-right mx-4">
@@ -95,18 +98,18 @@ const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
                                 <CashFlowItem label="Entradas" amount={s.cashAdditions} icon={<TrendingUp size={14}/>} />
                                 <CashFlowItem label="Salidas/Reembolsos" amount={-s.cashWithdrawals} icon={<TrendingDown size={14}/>} />
                            </ul>
-                           <div className="border-t dark:border-gray-600 mt-2 pt-2 flex justify-between font-bold"><span>Esperado:</span><span>${s.expectedCash.toFixed(2)}</span></div>
+                           <div className="border-t dark:border-gray-600 mt-2 pt-2 flex justify-between font-bold"><span>Esperado:</span><span>${s.expectedCash.toLocaleString()}</span></div>
                         </div>
                         {/* Conteo Físico */}
                          <div className="p-3 rounded-lg bg-white dark:bg-black">
                            <h4 className="font-semibold mb-2">Conteo Físico</h4>
-                           <div className="flex justify-between font-bold"><span>Contado:</span><span>${s.countedCash.toFixed(2)}</span></div>
+                           <div className="flex justify-between font-bold"><span>Contado:</span><span>${s.countedCash.toLocaleString()}</span></div>
                            <div className="flex justify-between font-bold"><span className="mr-2">Varianza:</span><VarianceDisplay variance={s.variance} /></div>
                            {s.notes && <div className="mt-2 text-xs text-gray-500 italic border-t dark:border-gray-600 pt-1"><strong>Notas:</strong> {s.notes}</div>}
                         </div>
                         {/* Desglose Conteo */}
                         <div className="p-3 rounded-lg bg-white dark:bg-black">
-                            <h4 className="font-semibold mb-2">Desglose de Conteo</h4>
+                            <h4 className="font-semibold mb-2">Desglose de Billetes</h4>
                             <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto">
                                {denominations.map(den => (
                                    s.countedDenominations[den.value] && (
@@ -147,7 +150,7 @@ const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({ onClose }) => {
 const CashFlowItem: React.FC<{ label: string; amount: number; icon: React.ReactNode; }> = ({ label, amount, icon }) => (
   <li className="flex justify-between items-center text-gray-600 dark:text-gray-400">
     <span className="flex items-center gap-1">{icon}{label}</span>
-    <span className="font-mono font-semibold">{amount < 0 && '-'}${Math.abs(amount).toFixed(2)}</span>
+    <span className="font-mono font-semibold">{amount < 0 && '-'}${Math.abs(amount).toLocaleString()}</span>
   </li>
 );
 

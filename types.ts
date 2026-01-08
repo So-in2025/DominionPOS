@@ -8,16 +8,16 @@ export interface PriceHistoryEntry {
 export interface Product {
   id: string;
   name: string;
-  price: number; // Selling Price
-  costPrice?: number; // Cost of goods sold (New)
+  price: number; 
+  costPrice?: number; 
   category: string;
   stock: number;
   lowStockThreshold?: number;
-  priceHistory?: PriceHistoryEntry[]; // Track inflation/changes (New)
+  priceHistory?: PriceHistoryEntry[]; 
 }
 
 export interface SaleItem {
-  id: string; // Unique ID for the line item in the sale
+  id: string; 
   productId?: string;
   name: string;
   price: number;
@@ -35,7 +35,7 @@ export type PromotionId = 'PROMO_BEBIDAS' | 'COMBO_KIOSCO' | 'SNACKS_3X2';
 
 export interface Transaction {
   id: string;
-  createdAt: number; // Using timestamp for simplicity
+  createdAt: number; 
   items: SaleItem[];
   total: number;
   paymentMethod: 'Efectivo' | 'Tarjeta' | 'Reembolso';
@@ -134,13 +134,13 @@ export interface BusinessSettings {
   address: string;
   phone: string;
   receiptFooter: string;
-  logoUrl?: string; // Base64 string for the logo
+  logoUrl?: string; 
 }
 
 export interface User {
   id: string;
   name: string;
-  pin: string; // Stored as plain text for this local-first app
+  pin: string; 
   role: 'admin' | 'cashier';
 }
 
@@ -149,30 +149,32 @@ export interface AuditLogEntry {
   timestamp: number;
   userId: string;
   userName: string;
-  action: string; // e.g., 'LOGIN', 'SALE_CREATED', 'PRODUCT_UPDATED'
+  action: string; 
   details?: string;
   severity: 'info' | 'warning' | 'critical';
 }
 
-// --- NEXUS PROTOCOL TYPES ---
+export interface DominionInsight {
+  id: string;
+  type: 'stock' | 'inflation' | 'sales' | 'risk' | 'favorite';
+  title: string;
+  message: string;
+  severity: 'low' | 'medium' | 'high';
+  timestamp: number;
+  actionLabel?: string;
+  actionId?: string;
+}
 
 export type PlanTier = 'starter' | 'pro' | 'enterprise';
-
-export type FeatureFlag = 
-    | 'ai_scanner'       // Escáner inteligente
-    | 'voice_ingest'     // Dictado de voz
-    | 'advanced_reports' // Dashboard completo
-    | 'custom_branding'  // Logo en recibos
-    | 'remote_config'    // Configuración remota
-    | 'inventory_alerts'; // Alertas de stock bajo
+export type FeatureFlag = 'ai_scanner' | 'voice_ingest' | 'advanced_reports' | 'custom_branding' | 'remote_config' | 'inventory_alerts';
 
 export interface CloudNodeIdentity {
-    nodeId: string;      // UUID único del dispositivo
-    licenseKey: string;  // Clave introducida por el usuario
+    nodeId: string;
+    licenseKey: string;
     lastSync: number;
     plan: PlanTier;
     status: 'active' | 'suspended' | 'banned';
-    messages?: string[]; // Mensajes del desarrollador al nodo
+    messages?: string[];
 }
 
 export interface TelemetryPacket {

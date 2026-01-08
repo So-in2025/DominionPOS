@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Mic, Square, Loader2, Save, RefreshCw, CheckCircle, Info, TrendingUp, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import { X, Mic, Square, Loader2, Save, RefreshCw, CheckCircle, Info, TrendingUp, AlertTriangle, Volume2, VolumeX, ShieldAlert } from 'lucide-react';
 import * as aiService from '../services/ai';
 import * as dbService from '../services/db';
 import * as soundService from '../services/sound';
@@ -21,7 +21,7 @@ interface ProcessedItem extends aiService.ScannedItem {
 }
 
 const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProductsUpdated }) => {
-  const [step, setStep] = useState<'instructions' | 'recording' | 'processing' | 'review'>('instructions');
+  const [step, setStep] = useState<'instructions' | 'recording' | 'processing' | 'review' | 'error_perm'>('instructions');
   const [timeLeft, setTimeLeft] = useState(60);
   const [isRecording, setIsRecording] = useState(false);
   const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
@@ -32,10 +32,8 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
 
-  // 30% Margin Strategy by default
   const TARGET_MARGIN = 0.30;
 
-  // Initial TTS Greeting
   useEffect(() => {
       try {
           if (!isMuted) {
@@ -43,20 +41,17 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
               ttsService.speak("Modo de voz activado. Menciona el costo de los productos para detectar inflación automáticamente.");
           }
       } catch (e) {
-          console.warn("Error playing initial sound/tts", e);
+          console.warn("Error audio", e);
       }
       return () => {
           try { ttsService.stopSpeaking(); } catch(e) {}
       };
-  }, []); // Only run once on mount
+  }, []);
 
   const toggleMute = () => {
-      const newMuteState = !isMuted;
-      setIsMuted(newMuteState);
-      if(!newMuteState) ttsService.stopSpeaking();
+      setIsMuted(!isMuted);
+      if(!isMuted) ttsService.stopSpeaking();
   };
-
-  // --- Recording Logic ---
 
   const startRecording = async () => {
     try {
@@ -66,15 +61,13 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         processAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop()); // Stop mic
+        stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
@@ -83,10 +76,9 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
       
       if (!isMuted) {
           soundService.playSound('click');
-          ttsService.speak("Escuchando. Dicta tus productos ahora.", true);
+          ttsService.speak("Escuchando.");
       }
       
-      // Timer Logic
       setTimeLeft(60);
       timerRef.current = window.setInterval(() => {
         setTimeLeft((prev) => {
@@ -94,17 +86,12 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
             stopRecording();
             return 0;
           }
-          if (prev % 10 === 0 && prev < 60) {
-              // Subtle tick every 10s to indicate life
-              if(!isMuted) soundService.playSound('processing'); 
-          }
           return prev - 1;
         });
       }, 1000);
 
     } catch (err) {
-      console.error(err);
-      setError("No se pudo acceder al micrófono.");
+      setStep('error_perm');
       if(!isMuted) soundService.playSound('error');
     }
   };
@@ -118,11 +105,9 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
     }
   };
 
-  // --- Processing Logic ---
-
   const processAudio = (blob: Blob) => {
     setStep('processing');
-    if (!isMuted) ttsService.speak("Procesando tu inventario. Un momento.", true);
+    if (!isMuted) ttsService.speak("Procesando tu inventario.");
     
     const reader = new FileReader();
     reader.readAsDataURL(blob);
@@ -130,10 +115,7 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
       const base64Audio = reader.result as string;
       try {
         const rawItems = await aiService.processAudioInventory(base64Audio);
-        
-        // Match with DB & Calculate Economics
         const dbProducts = dbService.getProducts();
-        let inflationCount = 0;
         
         const enrichedItems: ProcessedItem[] = rawItems.map(item => {
             const match = dbProducts.find(p => p.name.toLowerCase().includes(item.productName.toLowerCase()) || item.productName.toLowerCase().includes(p.name.toLowerCase()));
@@ -142,26 +124,19 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
             let suggestedPrice = item.sellingPrice > 0 ? item.sellingPrice : 0;
             let currentCost = 0;
             
-            if (!match && suggestedPrice === 0 && item.costPrice > 0) {
-                suggestedPrice = item.costPrice * (1 + TARGET_MARGIN);
-            }
-
             if (match) {
                 currentCost = match.costPrice || 0;
                 if (suggestedPrice === 0) suggestedPrice = match.price;
-
                 if (item.costPrice > 0 && currentCost > 0) {
                     inflationRate = ((item.costPrice - currentCost) / currentCost) * 100;
                 }
-
                 if (item.costPrice > currentCost && item.costPrice > 0) {
                      const currentMargin = (match.price - (match.costPrice || match.price * 0.7)) / match.price;
                      const targetMarginToKeep = Math.max(currentMargin, TARGET_MARGIN);
-                     if (item.sellingPrice === 0) {
-                        suggestedPrice = item.costPrice / (1 - targetMarginToKeep);
-                     }
-                     if (inflationRate > 5) inflationCount++; // Flag significant inflation
+                     if (item.sellingPrice === 0) suggestedPrice = item.costPrice / (1 - targetMarginToKeep);
                 }
+            } else if (suggestedPrice === 0 && item.costPrice > 0) {
+                suggestedPrice = item.costPrice * (1 + TARGET_MARGIN);
             }
 
             return {
@@ -177,37 +152,16 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
 
         setProcessedItems(enrichedItems);
         setStep('review');
-        
-        // Final Feedback
         if (!isMuted) {
-            if (inflationCount > 0) {
-                soundService.playSound('alert');
-                ttsService.speak(`He detectado ${rawItems.length} productos. Alerta: ${inflationCount} productos presentan inflación considerable. Revisa los precios sugeridos.`, true);
-            } else {
-                soundService.playSound('success');
-                ttsService.speak(`Procesado exitosamente. He detectado ${rawItems.length} productos.`, true);
-            }
+            soundService.playSound('success');
+            ttsService.speak(`Procesado exitosamente.`);
         }
-
       } catch (e: any) {
-        setError(e.message);
+        setError("La IA no pudo decodificar el audio claramente.");
         setStep('instructions');
-        if(!isMuted) {
-            soundService.playSound('error');
-            ttsService.speak("Hubo un error al entender el audio. Por favor intenta de nuevo.", true);
-        }
+        if(!isMuted) soundService.playSound('error');
       }
     };
-  };
-
-  // --- Review & Save Logic ---
-
-  const handleUpdateItem = (index: number, field: keyof ProcessedItem, value: any) => {
-    setProcessedItems(prev => {
-        const newItems = [...prev];
-        newItems[index] = { ...newItems[index], [field]: value };
-        return newItems;
-    });
   };
 
   const handleSave = async () => {
@@ -217,19 +171,16 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
               costPrice: item.costPrice,
               sellingPrice: item.sellingPrice
           };
-
           if (item.matchId) {
               const product = dbService.getProducts().find(p => p.id === item.matchId);
               if (product) {
-                  const newStock = product.stock + item.quantity;
-                  const updatedProduct: Product = {
+                  await dbService.updateProduct({
                       ...product,
-                      stock: newStock,
+                      stock: product.stock + item.quantity,
                       price: item.sellingPrice,
                       costPrice: item.costPrice > 0 ? item.costPrice : product.costPrice,
                       priceHistory: [...(product.priceHistory || []), priceHistoryEntry]
-                  };
-                  await dbService.updateProduct(updatedProduct);
+                  });
               }
           } else {
               await dbService.addProduct({
@@ -242,177 +193,125 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
               });
           }
       }
-      if(!isMuted) {
-          soundService.playSound('success');
-          ttsService.speak("Inventario actualizado correctamente.", true);
-      }
+      if(!isMuted) soundService.playSound('success');
       onProductsUpdated();
       onClose();
   };
 
-  const renderVisualizer = () => (
-    <div className="flex items-center justify-center gap-1 h-12 mb-4">
-        {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="w-2 bg-dp-blue dark:bg-dp-gold rounded-full animate-pulse" 
-                 style={{ height: `${Math.random() * 100}%`, animationDuration: `${0.5 + Math.random() * 0.5}s` }}></div>
-        ))}
-    </div>
-  );
-
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-dp-light dark:bg-dp-charcoal rounded-xl shadow-2xl w-full max-w-4xl m-4 flex flex-col max-h-[90vh] overflow-hidden animate-modal-in border border-dp-blue/30 dark:border-dp-gold/30" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/80 z-50 flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-dp-charcoal rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden animate-modal-in border border-dp-blue/30 dark:border-dp-gold/30" onClick={e => e.stopPropagation()}>
         
-        {/* Header */}
-        <div className="bg-dp-soft-gray dark:bg-black/40 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-dp-blue dark:text-dp-gold">
+        <div className="bg-dp-soft-gray dark:bg-black/40 p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <h2 className="text-xl font-black flex items-center gap-2 text-dp-blue dark:text-dp-gold uppercase">
                 <Mic size={24} /> 
-                Dominion Voice Intelligence
+                Dominion Voice
             </h2>
-            <div className="flex items-center gap-2">
-                <button onClick={toggleMute} className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-3">
+                <button onClick={toggleMute} className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500">
                     {isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
                 </button>
                 <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-600 dark:text-gray-300"><X size={20}/></button>
             </div>
         </div>
 
-        <div className="flex-grow p-6 overflow-y-auto">
-            {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm font-semibold animate-pulse">{error}</div>}
+        <div className="flex-grow p-6 overflow-y-auto custom-scrollbar">
+            {step === 'error_perm' && (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+                    <div className="p-6 bg-red-100 text-red-600 rounded-full animate-shake"><ShieldAlert size={64}/></div>
+                    <h3 className="text-2xl font-black uppercase text-dp-dark-gray dark:text-white">Acceso Denegado</h3>
+                    <p className="max-w-xs text-gray-500 text-sm font-bold">No tenemos permiso para usar el micrófono. Por favor habilítalo en la barra de direcciones y reintenta.</p>
+                    <button onClick={() => setStep('instructions')} className="px-8 py-3 bg-dp-blue text-white font-black uppercase text-xs rounded-xl shadow-lg">Entendido</button>
+                </div>
+            )}
 
             {step === 'instructions' && (
-                <div className="text-center space-y-6">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                        <h3 className="font-bold text-lg mb-2 flex items-center justify-center gap-2 text-gray-900 dark:text-white">
-                            <Info size={20}/> Ingesta por Voz con Detección de Inflación
-                        </h3>
-                        <p className="text-gray-700 dark:text-gray-300 mb-4">
-                            Menciona el <strong>COSTO</strong> para que la IA detecte aumentos y sugiera nuevos precios automáticamente.
-                        </p>
-                        <div className="text-left bg-white dark:bg-black/30 p-3 rounded text-sm space-y-2 font-mono text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
-                            <p className="text-gray-600 dark:text-gray-400 font-bold mb-1">Ejemplos para control de inflación:</p>
-                            <div className="flex items-center gap-2">
-                                <CheckCircle size={14} className="text-green-500"/> "10 cajas de leche, costo 5 dólares"
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <CheckCircle size={14} className="text-green-500"/> "Harina Pan, me costó 20, vender a 30"
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <CheckCircle size={14} className="text-green-500"/> "Coca Cola, reposición de 50, costo 1.50"
+                <div className="h-full flex flex-col items-center justify-center space-y-8 py-10">
+                    <div className="text-center space-y-3">
+                        <div className="inline-flex p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/50 max-w-md">
+                            <Info size={32} className="text-dp-blue dark:text-dp-gold flex-shrink-0 mr-4 mt-1"/>
+                            <div className="text-left">
+                                <p className="text-xs font-black text-dp-blue dark:text-dp-gold uppercase tracking-widest mb-1">Algoritmo de Detección de Inflación</p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Dicta tus productos y menciona la palabra <strong className="text-dp-dark-gray dark:text-white underline">"Costo"</strong>. Nuestra IA detectará el alza de precios y te sugerirá el nuevo PVP para mantener tu rentabilidad.</p>
                             </div>
                         </div>
                     </div>
                     
-                    <button 
-                        onClick={startRecording}
-                        className="w-24 h-24 rounded-full bg-red-500 hover:bg-red-600 shadow-lg flex items-center justify-center transition-transform hover:scale-110 mx-auto ring-4 ring-red-200 dark:ring-red-900/30"
-                    >
-                        <Mic size={40} className="text-white"/>
+                    <button onClick={startRecording} className="w-28 h-28 rounded-full bg-red-500 hover:bg-red-600 shadow-[0_0_40px_rgba(239,68,68,0.4)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 group">
+                        <Mic size={48} className="text-white group-hover:animate-pulse"/>
                     </button>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 font-semibold">Presiona para comenzar</p>
+                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.4em] animate-pulse">Pulsar para Dictar</p>
+                    {error && <p className="text-red-500 font-bold text-xs bg-red-50 px-3 py-1 rounded">{error}</p>}
                 </div>
             )}
 
             {step === 'recording' && (
-                <div className="text-center py-10">
-                    <h3 className="text-2xl font-bold mb-4 text-red-500 animate-pulse">Escuchando...</h3>
-                    <div className="text-5xl font-mono font-bold mb-8 text-gray-900 dark:text-white">
+                <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                    <div className="text-6xl font-black font-mono mb-8 text-dp-dark-gray dark:text-white tabular-nums drop-shadow-sm">
                         00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
                     </div>
-                    
-                    {renderVisualizer()}
-
-                    <button 
-                        onClick={stopRecording}
-                        className="w-20 h-20 rounded-full bg-gray-800 dark:bg-gray-200 hover:opacity-80 flex items-center justify-center mx-auto mt-4 transition-colors"
-                    >
-                        <Square size={32} className="text-white dark:text-black fill-current"/>
+                    <div className="flex items-center justify-center gap-1.5 h-16 mb-10 w-64">
+                        {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                            <div key={i} className="w-2.5 bg-red-500 rounded-full animate-bounce" 
+                                 style={{ height: `${20 + Math.random() * 80}%`, animationDelay: `${i * 0.1}s` }}></div>
+                        ))}
+                    </div>
+                    <button onClick={stopRecording} className="px-10 py-4 bg-dp-dark-gray text-white dark:bg-white dark:text-black font-black uppercase text-xs tracking-[0.2em] rounded-2xl hover:brightness-110 shadow-2xl active:scale-95 transition-all flex items-center gap-3">
+                        <Square size={16} className="fill-current"/> Finalizar Dictado
                     </button>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 font-medium">Detener y Analizar</p>
                 </div>
             )}
 
             {step === 'processing' && (
-                <div className="text-center py-16">
-                    <Loader2 size={64} className="animate-spin text-dp-blue dark:text-dp-gold mx-auto mb-4"/>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Procesando Audio...</h3>
-                    <p className="text-gray-600 dark:text-gray-400">Analizando costos e inflación.</p>
+                <div className="h-full flex flex-col items-center justify-center py-20">
+                    <Loader2 size={80} className="animate-spin text-dp-blue dark:text-dp-gold mb-6"/>
+                    <h3 className="text-xl font-black uppercase tracking-widest text-dp-dark-gray dark:text-white">Analizando Fonemas...</h3>
+                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Diferenciando Costo vs Venta</p>
                 </div>
             )}
 
             {step === 'review' && (
-                <div>
-                    <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Revisión de Ingesta Inteligente</h3>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 dark:bg-gray-800 text-xs uppercase text-gray-700 dark:text-gray-300">
+                <div className="animate-modal-in">
+                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Revisión de Ingesta por Voz</h3>
+                    <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
+                        <table className="w-full text-sm text-left border-collapse">
+                            <thead className="bg-gray-50 dark:bg-black/40 text-[10px] font-black text-gray-500 uppercase tracking-widest">
                                 <tr>
-                                    <th className="px-3 py-2">Producto</th>
-                                    <th className="px-3 py-2 text-center">Cant.</th>
-                                    <th className="px-3 py-2 text-right">Costo (Nuevo)</th>
-                                    <th className="px-3 py-2 text-center">Inflación</th>
-                                    <th className="px-3 py-2 text-right">Precio Venta</th>
+                                    <th className="px-4 py-4">Ítem Identificado</th>
+                                    <th className="px-4 py-4 text-center">Cant.</th>
+                                    <th className="px-4 py-4 text-right">Costo</th>
+                                    <th className="px-4 py-4 text-center">Estado</th>
+                                    <th className="px-4 py-4 text-right">PVP Actualizado</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {processedItems.map((item, idx) => (
-                                    <tr key={idx} className="bg-white dark:bg-dp-charcoal hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                        <td className="px-3 py-2">
-                                            <input 
-                                                type="text" 
-                                                value={item.productName} 
-                                                onChange={(e) => handleUpdateItem(idx, 'productName', e.target.value)}
-                                                className="w-full bg-transparent border-none focus:ring-0 font-medium text-gray-900 dark:text-white placeholder-gray-400"
-                                            />
-                                            {item.isNew ? (
-                                                <span className="text-[10px] bg-blue-100 text-blue-800 px-1 rounded font-semibold">Nuevo</span>
-                                            ) : (
-                                                <span className="text-[10px] text-green-600 font-semibold">Stock Actual: {dbService.getProducts().find(p=>p.id===item.matchId)?.stock}</span>
-                                            )}
+                                    <tr key={idx} className="bg-white dark:bg-dp-charcoal/50 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                                        <td className="px-4 py-3">
+                                            <input type="text" value={item.productName} 
+                                                   onChange={(e) => {
+                                                        const newItems = [...processedItems];
+                                                        newItems[idx].productName = e.target.value;
+                                                        setProcessedItems(newItems);
+                                                   }}
+                                                   className="bg-transparent border-none focus:ring-0 w-full font-bold text-sm text-dp-dark-gray dark:text-gray-200 p-0" />
+                                            <span className="text-[9px] font-black uppercase text-gray-400">{item.isNew ? 'Nuevo Registro' : 'Existente'}</span>
                                         </td>
-                                        <td className="px-3 py-2">
-                                            <input 
-                                                type="number" 
-                                                value={item.quantity} 
-                                                onChange={(e) => handleUpdateItem(idx, 'quantity', parseInt(e.target.value))}
-                                                className="w-16 text-center bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded border-none focus:ring-2 focus:ring-dp-blue"
-                                            />
+                                        <td className="px-4 py-3 text-center font-black">${item.quantity}</td>
+                                        <td className="px-4 py-3 text-right font-mono font-black text-sm">${item.costPrice.toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            {item.inflationRate && item.inflationRate > 0 ? (
+                                                <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase animate-pulse">Inflación +{item.inflationRate.toFixed(0)}%</span>
+                                            ) : <span className="text-gray-400 font-black uppercase text-[9px]">Ok</span>}
                                         </td>
-                                        <td className="px-3 py-2 text-right font-mono">
-                                            <div className="relative">
-                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">C:</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={item.costPrice} 
-                                                    onChange={(e) => handleUpdateItem(idx, 'costPrice', parseFloat(e.target.value))}
-                                                    className="w-20 pl-6 py-1 text-right bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded border-none focus:ring-2 focus:ring-dp-blue"
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2 text-center">
-                                            {item.inflationRate !== undefined && item.inflationRate > 0 ? (
-                                                <div className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-300 px-2 py-1 rounded animate-pulse">
-                                                    <TrendingUp size={12}/> +{item.inflationRate.toFixed(1)}%
-                                                </div>
-                                            ) : (
-                                                <span className="text-gray-400">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <div className="relative">
-                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={item.sellingPrice} 
-                                                    onChange={(e) => handleUpdateItem(idx, 'sellingPrice', parseFloat(e.target.value))}
-                                                    className={`w-24 pl-5 py-1 text-right rounded border-none font-bold text-gray-900 dark:text-white ${
-                                                        item.inflationRate && item.inflationRate > 0 
-                                                        ? 'bg-yellow-100 text-yellow-900 ring-2 ring-yellow-400 dark:bg-yellow-900/50 dark:text-yellow-100' 
-                                                        : 'bg-gray-100 dark:bg-gray-700'
-                                                    }`}
-                                                />
-                                            </div>
-                                            {item.inflationRate !== undefined && item.inflationRate > 0 && <p className="text-[9px] text-yellow-600 dark:text-yellow-400 mt-0.5 font-bold">Sugerido</p>}
+                                        <td className="px-4 py-3 text-right">
+                                            <input type="number" value={item.sellingPrice} 
+                                                   onChange={(e) => {
+                                                       const newItems = [...processedItems];
+                                                       newItems[idx].sellingPrice = parseFloat(e.target.value);
+                                                       setProcessedItems(newItems);
+                                                   }}
+                                                   className={`w-24 text-right font-black text-sm rounded-lg p-1.5 border-none focus:ring-1 ${item.inflationRate && item.inflationRate > 0 ? 'bg-yellow-50 text-yellow-800 ring-1 ring-yellow-400' : 'bg-gray-100 dark:bg-black/40 dark:text-white'}`} />
                                         </td>
                                     </tr>
                                 ))}
@@ -423,14 +322,11 @@ const VoiceIngestModal: React.FC<VoiceIngestModalProps> = ({ onClose, onProducts
             )}
         </div>
 
-        {/* Footer */}
         {step === 'review' && (
-            <div className="p-4 bg-gray-50 dark:bg-black/20 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
-                <button onClick={() => { setStep('instructions'); if(!isMuted) soundService.playSound('click'); }} className="px-4 py-2 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2 transition-colors">
-                    <RefreshCw size={16}/> Descartar
-                </button>
-                <button onClick={handleSave} className="flex items-center gap-2 px-6 py-2 bg-dp-blue dark:bg-dp-gold text-white dark:text-dp-dark font-bold rounded-lg hover:brightness-110 shadow-lg transition-all transform hover:scale-105">
-                    <Save size={18}/> Confirmar Inventario
+            <div className="p-5 bg-dp-soft-gray dark:bg-black/40 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center flex-shrink-0">
+                <button onClick={() => setStep('instructions')} className="px-6 py-2 text-gray-500 font-black uppercase text-[10px] tracking-widest hover:text-dp-dark-gray dark:hover:text-white transition-colors flex items-center gap-2"><RefreshCw size={14}/> Descartar</button>
+                <button onClick={handleSave} className="px-8 py-3 bg-dp-blue dark:bg-dp-gold text-white dark:text-dp-dark font-black uppercase text-xs tracking-widest rounded-xl shadow-xl hover:brightness-110 flex items-center gap-2">
+                    <Save size={18}/> Actualizar Inventario Real
                 </button>
             </div>
         )}

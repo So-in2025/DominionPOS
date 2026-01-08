@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ShiftSummary } from '../types';
 import * as dbService from '../services/db';
@@ -21,11 +22,14 @@ interface SummaryData {
 }
 
 const denominations = [
-    { value: 100, label: '$100' }, { value: 50, label: '$50' },
-    { value: 20, label: '$20' }, { value: 10, label: '$10' },
-    { value: 5, label: '$5' }, { value: 1, label: '$1' },
-    { value: 0.25, label: '25¢' }, { value: 0.10, label: '10¢' },
-    { value: 0.05, label: '5¢' }, { value: 0.01, label: '1¢' },
+    { value: 20000, label: '$20.000' },
+    { value: 10000, label: '$10.000' },
+    { value: 2000, label: '$2.000' },
+    { value: 1000, label: '$1.000' },
+    { value: 500, label: '$500' },
+    { value: 200, label: '$200' },
+    { value: 100, label: '$100' },
+    { value: 50, label: '$50' },
 ];
 
 const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose, onFinalizeShift }) => {
@@ -47,7 +51,6 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
             acc.cardSales += tx.total;
           }
       }
-      // Refunds are also cash movements, effectively.
       if (tx.type === 'refund' && tx.paymentMethod === 'Reembolso') {
           acc.cashWithdrawals += -tx.total;
       }
@@ -87,8 +90,6 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
   const handleFinalize = () => {
     if (!summary) return;
     
-    // FIX: Switched from Object.entries to Object.keys and explicitly typed the accumulator and key in reduce.
-    // This makes the type inference more robust and resolves potential issues with key types.
     const countedDenominations = Object.keys(counts).reduce((acc: {[key: string]: number}, key) => {
         const numValue = parseInt(counts[key], 10);
         if(!isNaN(numValue) && numValue > 0) {
@@ -120,7 +121,7 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
         <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-dp-dark-gray dark:text-dp-light-gray">Cierre de Turno</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Reconciliación de caja para el turno actual.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Reconciliación de caja (Pesos Argentinos).</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-dp-soft-gray dark:hover:bg-gray-700" aria-label="Cerrar"><X size={24} /></button>
         </div>
@@ -133,53 +134,53 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
           <div className="flex flex-col md:flex-row gap-6 flex-grow overflow-hidden">
             {/* Left Panel: Summary */}
             <div className="md:w-1/3 flex flex-col gap-4">
-                <SummaryCard title="Ventas Totales" value={`$${summary.totalSales.toFixed(2)}`} icon={<Hash />} />
+                <SummaryCard title="Ventas Totales" value={`$${summary.totalSales.toLocaleString()}`} icon={<Hash />} />
                 <div className="p-4 rounded-lg bg-dp-soft-gray dark:bg-black flex-grow">
-                  <h3 className="font-semibold mb-3 text-lg">Resumen de Flujo de Efectivo</h3>
+                  <h3 className="font-semibold mb-3 text-lg">Resumen de Flujo</h3>
                   <ul className="space-y-2 text-sm">
-                    <CashFlowItem label="Fondo de Caja Inicial" amount={summary.initialAmount} icon={<ChevronsRight size={16}/>} color="text-gray-500 dark:text-gray-400" />
-                    <CashFlowItem label="Ventas en Efectivo" amount={summary.cashSales} icon={<TrendingUp size={16}/>} color="text-green-600 dark:text-green-400" />
-                    <CashFlowItem label="Entradas de Efectivo" amount={summary.cashAdditions} icon={<TrendingUp size={16}/>} color="text-green-600 dark:text-green-400" />
-                    <CashFlowItem label="Salidas/Reembolsos" amount={-summary.cashWithdrawals} icon={<TrendingDown size={16}/>} color="text-red-600 dark:text-red-400" />
+                    <CashFlowItem label="Fondo Inicial" amount={summary.initialAmount} icon={<ChevronsRight size={16}/>} color="text-gray-500 dark:text-gray-400" />
+                    <CashFlowItem label="Ventas Efectivo" amount={summary.cashSales} icon={<TrendingUp size={16}/>} color="text-green-600 dark:text-green-400" />
+                    <CashFlowItem label="Entradas Extra" amount={summary.cashAdditions} icon={<TrendingUp size={16}/>} color="text-green-600 dark:text-green-400" />
+                    <CashFlowItem label="Salidas/Retiros" amount={-summary.cashWithdrawals} icon={<TrendingDown size={16}/>} color="text-red-600 dark:text-red-400" />
                   </ul>
                   <div className="border-t border-gray-300 dark:border-gray-600 mt-3 pt-3 flex justify-between items-center">
                     <span className="font-bold text-base">Efectivo Esperado</span>
-                    <span className="font-bold text-xl text-dp-blue dark:text-dp-gold">${summary.expectedCash.toFixed(2)}</span>
+                    <span className="font-bold text-xl text-dp-blue dark:text-dp-gold">${summary.expectedCash.toLocaleString()}</span>
                   </div>
                 </div>
             </div>
 
             {/* Right Panel: Physical Count */}
             <div className="md:w-2/3 flex flex-col border-t-2 md:border-t-0 md:border-l-2 pt-4 md:pt-0 md:pl-6 border-dashed border-gray-300 dark:border-gray-700">
-              <h3 className="text-lg font-semibold mb-2">Conteo de Efectivo Físico</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto pr-2 pb-2">
+              <h3 className="text-lg font-semibold mb-2">Conteo de Billetes</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 gap-3 overflow-y-auto pr-2 pb-2">
                 {denominations.map(den => (
-                  <div key={den.value}>
-                    <label className="text-sm font-medium">{den.label}</label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-gray-400 text-sm">x</span>
+                  <div key={den.value} className="flex items-center justify-between bg-dp-soft-gray dark:bg-black/30 p-2 rounded-lg">
+                    <label className="text-sm font-bold w-16">{den.label}</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-xs">cant.</span>
                       <input type="number" min="0" value={counts[den.value.toString()] || ''}
                              onChange={e => setCounts(prev => ({...prev, [den.value.toString()]: e.target.value}))}
-                             className="w-full p-1 rounded-md border bg-dp-light dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-dp-blue dark:focus:ring-dp-gold focus:outline-none" />
+                             className="w-20 p-1.5 rounded-md border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-dp-blue dark:focus:ring-dp-gold focus:outline-none text-right font-mono" />
                     </div>
                   </div>
                 ))}
               </div>
                <textarea value={notes} onChange={e => setNotes(e.target.value)}
                          className="w-full mt-3 p-2 rounded-md border bg-dp-light dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-dp-blue dark:focus:ring-dp-gold focus:outline-none text-sm"
-                         placeholder="Notas adicionales (ej: diferencia por error de cambio)..." rows={2}></textarea>
+                         placeholder="Observaciones del arqueo..." rows={2}></textarea>
               <div className="mt-auto pt-4 space-y-2">
                  <div className="flex justify-between items-center text-lg font-bold">
                     <span>Total Contado:</span>
-                    <span>${countedTotal.toFixed(2)}</span>
+                    <span>${countedTotal.toLocaleString()}</span>
                  </div>
                  <div className={`flex justify-between items-center text-xl font-bold p-2 rounded-md
                     ${variance === 0 && countedTotal > 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300' : ''}
                     ${variance > 0 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300' : ''}
                     ${variance < 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300' : ''}
                  `}>
-                    <span>Varianza:</span>
-                    <span>{variance < 0 ? '-' : variance > 0 ? '+' : ''}${Math.abs(variance).toFixed(2)} {variance !== 0 && `(${variance < 0 ? 'Faltante' : 'Sobrante'})`}</span>
+                    <span>Diferencia:</span>
+                    <span>{variance < 0 ? '-' : variance > 0 ? '+' : ''}${Math.abs(variance).toLocaleString()}</span>
                  </div>
               </div>
             </div>
@@ -193,7 +194,7 @@ const CashDrawerSummaryModal: React.FC<CashDrawerSummaryModalProps> = ({ onClose
             </button>
              <button type="button" onClick={handleFinalize} disabled={!hasOperations || countedTotal === 0}
                 className="flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold transition-colors text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
-              <Lock size={16}/> Finalizar Turno
+              <Lock size={16}/> Cerrar Caja
             </button>
         </div>
       </div>
@@ -213,7 +214,7 @@ const SummaryCard: React.FC<{ title: string; value: string; icon: React.ReactNod
 const CashFlowItem: React.FC<{ label: string; amount: number; icon: React.ReactNode; color: string; }> = ({ label, amount, icon, color }) => (
   <li className={`flex justify-between items-center ${color}`}>
     <span className="flex items-center gap-2">{icon}{label}</span>
-    <span className="font-mono font-semibold">{amount < 0 && '-'}${Math.abs(amount).toFixed(2)}</span>
+    <span className="font-mono font-semibold">{amount < 0 && '-'}${Math.abs(amount).toLocaleString()}</span>
   </li>
 );
 

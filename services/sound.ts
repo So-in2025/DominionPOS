@@ -3,16 +3,33 @@ let audioCtx: AudioContext | null = null;
 
 type SoundType = 'click' | 'success' | 'error' | 'alert' | 'pop' | 'processing' | 'beep' | 'cash' | 'trash' | 'hero' | 'type';
 
+/**
+ * Asegura que el contexto de audio esté activo tras una interacción del usuario.
+ * Debe llamarse en el primer clic/toque global de la app.
+ */
+export const resumeAudioContext = async () => {
+    if (!audioCtx) {
+        // @ts-ignore
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+        }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+    }
+};
+
 export const playSound = (type: SoundType) => {
   if (typeof window === 'undefined') return;
 
-  // --- Haptic Feedback (Vibración) ---
+  // --- Haptic Feedback ---
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
           switch (type) {
               case 'type':
               case 'click':
-                  navigator.vibrate(5); // Micro-impacto táctil
+                  navigator.vibrate(5);
                   break;
               case 'beep':
                   navigator.vibrate(10);
@@ -23,32 +40,31 @@ export const playSound = (type: SoundType) => {
               case 'success':
               case 'hero':
               case 'cash':
-                  navigator.vibrate([10, 30, 10]); // Patrón de éxito
+                  navigator.vibrate([10, 30, 10]);
                   break;
               case 'error':
               case 'alert':
-                  navigator.vibrate([50, 50, 50]); // Vibración fuerte
+                  navigator.vibrate([50, 50, 50]);
                   break;
           }
-      } catch (e) {
-          // Ignorar errores de vibración (ej: permisos o hardware no compatible)
-      }
+      } catch (e) {}
   }
 
   // --- Audio Synthesis ---
   try {
     if (!audioCtx) {
-      // @ts-ignore
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtx = new AudioContextClass();
-      }
+        // @ts-ignore
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+        }
     }
 
     if (!audioCtx) return;
 
     if (audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+      // No intentamos resumir aquí para evitar promesas pendientes en cada sonido
+      return; 
     }
 
     const osc = audioCtx.createOscillator();
@@ -64,23 +80,23 @@ export const playSound = (type: SoundType) => {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(800, now);
         osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
-        gainNode.gain.setValueAtTime(0.05, now); // Vol bajo
+        gainNode.gain.setValueAtTime(0.05, now);
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
         osc.start(now);
         osc.stop(now + 0.05);
         break;
       
-      case 'type': // New: Mechanical keyboard sound
+      case 'type':
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(600, now);
         osc.frequency.exponentialRampToValueAtTime(300, now + 0.03);
-        gainNode.gain.setValueAtTime(0.08, now); // Ligeramente más audible
+        gainNode.gain.setValueAtTime(0.08, now);
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
         osc.start(now);
         osc.stop(now + 0.03);
         break;
 
-      case 'beep': // New: Scanner beep
+      case 'beep':
         osc.type = 'square';
         osc.frequency.setValueAtTime(1800, now);
         gainNode.gain.setValueAtTime(0.05, now);
@@ -99,7 +115,7 @@ export const playSound = (type: SoundType) => {
         osc.stop(now + 0.1);
         break;
         
-      case 'trash': // New: Deletion sound
+      case 'trash':
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(150, now);
         osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
@@ -110,7 +126,6 @@ export const playSound = (type: SoundType) => {
         break;
 
       case 'success':
-        // Arpeggio C Major
         const notes = [523.25, 659.25, 783.99, 1046.50]; 
         notes.forEach((freq, i) => {
             if(!audioCtx) return;
@@ -129,7 +144,7 @@ export const playSound = (type: SoundType) => {
         });
         break;
         
-      case 'cash': // New: Cash Register sound
+      case 'cash':
         const coins = [1200, 1600, 2000];
         coins.forEach((freq, i) => {
             if(!audioCtx) return;
@@ -137,7 +152,7 @@ export const playSound = (type: SoundType) => {
             const g = audioCtx.createGain();
             o.connect(g);
             g.connect(audioCtx.destination);
-            o.type = 'sine'; // Metallic sine
+            o.type = 'sine';
             o.frequency.setValueAtTime(freq, now + (i*0.05));
             g.gain.setValueAtTime(0, now + (i*0.05));
             g.gain.linearRampToValueAtTime(0.1, now + (i*0.05) + 0.02);
@@ -147,8 +162,8 @@ export const playSound = (type: SoundType) => {
         });
         break;
         
-      case 'hero': // New: Login Success Chord
-        const chord = [261.63, 329.63, 392.00, 523.25]; // C Major
+      case 'hero':
+        const chord = [261.63, 329.63, 392.00, 523.25];
         chord.forEach((freq) => {
             if(!audioCtx) return;
             const o = audioCtx.createOscillator();
@@ -195,7 +210,5 @@ export const playSound = (type: SoundType) => {
          osc.stop(now + 0.1);
          break;
     }
-  } catch (e) {
-    // Fail silently
-  }
+  } catch (e) {}
 };

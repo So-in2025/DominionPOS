@@ -109,11 +109,26 @@ const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   
-  // Refs for background listeners
+  // Refs
   const barcodeBufferRef = useRef('');
   const barcodeTimerRef = useRef<number | null>(null);
 
-  // Data Fetching & Caching
+  // --- AUDIO AWAKEN LOGIC ---
+  useEffect(() => {
+    const awakenAudio = () => {
+        soundService.resumeAudioContext();
+        // Remove listener once audio is potentially awake
+        window.removeEventListener('click', awakenAudio);
+        window.removeEventListener('touchstart', awakenAudio);
+    };
+    window.addEventListener('click', awakenAudio);
+    window.addEventListener('touchstart', awakenAudio);
+    return () => {
+        window.removeEventListener('click', awakenAudio);
+        window.removeEventListener('touchstart', awakenAudio);
+    };
+  }, []);
+
   const refreshData = useCallback(() => {
     setProducts(dbService.getProducts());
     setPurchaseOrders(dbService.getPurchaseOrders());
@@ -127,12 +142,10 @@ const App: React.FC = () => {
       await dbService.initDB();
       refreshData();
       
-      // Subscribe to real-time changes from DB (triggered by Cloud Sync)
       dbService.setChangeListener(() => {
           refreshData();
       });
       
-      // Init Cloud Connection (Silent check)
       cloudService.connectToNexus().then(res => {
           if(res.success && res.message.includes("PRO")) {
               showToast(res.message, "success");
@@ -144,7 +157,6 @@ const App: React.FC = () => {
     loadData();
   }, [refreshData]);
 
-  // Favorites state management
   useEffect(() => {
     try {
         const storedFavorites = localStorage.getItem('dominion-favorites');
@@ -152,7 +164,6 @@ const App: React.FC = () => {
             setFavorites(JSON.parse(storedFavorites));
         }
     } catch (error) {
-        console.error("Failed to load favorites from localStorage", error);
         setFavorites([]);
     }
   }, []);
@@ -160,12 +171,9 @@ const App: React.FC = () => {
   useEffect(() => {
       try {
           localStorage.setItem('dominion-favorites', JSON.stringify(favorites));
-      } catch (error) {
-          console.error("Failed to save favorites to localStorage", error);
-      }
+      } catch (error) {}
   }, [favorites]);
   
-  // Reset customer detail view if switching away
   useEffect(() => {
       if (currentView !== 'customers') {
           setViewingCustomer(null);
@@ -193,13 +201,19 @@ const App: React.FC = () => {
     setCurrentUser(user);
     dbService.setCurrentUserForAudit(user);
     await dbService.logAction('LOGIN', `Inicio de sesión exitoso`, 'info');
-    soundService.playSound('hero'); // Hero sound
-    ttsService.speak(`Bienvenido, ${user.name}. Sistema listo.`, true);
+    await dbService.rotateAuditLogs(); // Mantenimiento proactivo tras login
+    
+    // Despertar audio proactivamente tras interacción exitosa
+    soundService.resumeAudioContext().then(() => {
+        soundService.playSound('hero');
+        ttsService.speak(`Bienvenido, ${user.name}. Sistema listo.`, true);
+    });
 
     if(user.role === 'cashier'){
         setCurrentView('catalog');
     }
   };
+
   const handleLogout = async () => {
     if (currentUser) {
         await dbService.logAction('LOGOUT', `Cierre de sesión`, 'info');
@@ -230,14 +244,12 @@ const App: React.FC = () => {
 
     if (product.stock > totalQuantityInCart) {
         addItem(product);
-        soundService.playSound('beep'); // Beep Sound
+        soundService.playSound('beep');
     } else {
         soundService.playSound('error');
         showToast("Stock insuficiente para añadir más unidades.", "error");
     }
   }, [addItem, saleItems, showToast]);
-  
-  // ... (Rest of component remains same, just ensuring dbService sync works)
   
   const executeProtectedAction = (action: { type: 'priceOverride' | 'refund', payload: any }) => {
       if (action.type === 'priceOverride') {
@@ -309,7 +321,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteParkedSale = async (saleId: string) => {
-    if (window.confirm("¿Está seguro de que desea eliminar esta venta aparcada? Esta acción no se puede deshacer.")) {
+    if (window.confirm("¿Está seguro de que desea eliminar esta venta aparcada?")) {
         await dbService.deleteParkedSale(saleId);
         refreshData();
         showToast("Venta aparcada eliminada");
@@ -350,7 +362,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (window.confirm('¿Está seguro de que desea eliminar este producto? Esta acción no se puede deshacer.')) {
+    if (window.confirm('¿Está seguro de que desea eliminar este producto?')) {
       await dbService.deleteProduct(productId);
       refreshData();
       showToast("Producto eliminado", "success");
@@ -485,7 +497,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteCustomer = async (customerId: string) => {
-    if (window.confirm('¿Está seguro de que desea eliminar este cliente? Todas sus transacciones pasadas se desvincularán de él, pero no se eliminarán. Esta acción no se puede deshacer.')) {
+    if (window.confirm('¿Está seguro de que desea eliminar este cliente?')) {
       await dbService.deleteCustomer(customerId);
       refreshData();
       setViewingCustomer(null);
@@ -548,7 +560,7 @@ const App: React.FC = () => {
     setIsCommandPaletteOpen(false);
   };
 
-  // Global Keyboard Shortcuts & Barcode Scanner
+  // Shortcuts
   useEffect(() => {
     if (!currentUser) return; 
 
@@ -566,7 +578,7 @@ const App: React.FC = () => {
             if (foundProduct && currentView === 'catalog') {
               handleProductClick(foundProduct);
             } else if (currentView === 'catalog') {
-              showToast(`Producto no encontrado para el código: ${scannedCode}`, 'error');
+              showToast(`Producto no encontrado: ${scannedCode}`, 'error');
               soundService.playSound('error');
             }
           }
@@ -591,29 +603,29 @@ const App: React.FC = () => {
         handleOpenPaymentModal();
       } else if (event.key === 'Escape') {
         event.preventDefault();
-        if (isCommandPaletteOpen) setIsCommandPaletteOpen(false);
-        else if (isAddModalOpen) setIsAddModalOpen(false);
-        else if (isEditModalOpen) setIsEditModalOpen(false);
-        else if (isHistoryModalOpen) setIsHistoryModalOpen(false);
-        else if (isPaymentModalOpen) setIsPaymentModalOpen(false);
-        else if (isSummaryModalOpen) setIsSummaryModalOpen(false);
-        else if (isSettingsModalOpen) setIsSettingsModalOpen(false);
-        else if (isSalePanelModalOpen) setIsSalePanelModalOpen(false);
-        else if (isPODetailOpen) setIsPODetailOpen(false);
-        else if (isAddCustomerModalOpen) setIsAddCustomerModalOpen(false);
-        else if (isEditCustomerModalOpen) setIsEditCustomerModalOpen(false);
-        else if (isCustomerSelectModalOpen) setIsCustomerSelectModalOpen(false);
-        else if (isReturnModalOpen) setIsReturnModalOpen(false);
-        else if (isPostSaleModalOpen) setIsPostSaleModalOpen(false);
-        else if (isReceiptModalOpen) setIsReceiptModalOpen(false);
-        else if (isCashManagementModalOpen) setIsCashManagementModalOpen(false);
-        else if (isShiftHistoryModalOpen) setIsShiftHistoryModalOpen(false);
-        else if (isCustomItemModalOpen) setIsCustomItemModalOpen(false);
-        else if (isParkedSalesModalOpen) setIsParkedSalesModalOpen(false);
-        else if (isSmartScannerOpen) setIsSmartScannerOpen(false);
-        else if (isVoiceIngestOpen) setIsVoiceIngestOpen(false);
-        else if (isAdminOverrideOpen) setIsAdminOverrideOpen(false);
-        else if (isUpgradeModalOpen) setIsUpgradeModalOpen(false);
+        setIsCommandPaletteOpen(false);
+        setIsAddModalOpen(false);
+        setIsEditModalOpen(false);
+        setIsHistoryModalOpen(false);
+        setIsPaymentModalOpen(false);
+        setIsSummaryModalOpen(false);
+        setIsSettingsModalOpen(false);
+        setIsSalePanelModalOpen(false);
+        setIsPODetailOpen(false);
+        setIsAddCustomerModalOpen(false);
+        setIsEditCustomerModalOpen(false);
+        setIsCustomerSelectModalOpen(false);
+        setIsReturnModalOpen(false);
+        setIsPostSaleModalOpen(false);
+        setIsReceiptModalOpen(false);
+        setIsCashManagementModalOpen(false);
+        setIsShiftHistoryModalOpen(false);
+        setIsCustomItemModalOpen(false);
+        setIsParkedSalesModalOpen(false);
+        setIsSmartScannerOpen(false);
+        setIsVoiceIngestOpen(false);
+        setIsAdminOverrideOpen(false);
+        setIsUpgradeModalOpen(false);
       }
     };
 
@@ -623,12 +635,7 @@ const App: React.FC = () => {
       if (barcodeTimerRef.current) clearTimeout(barcodeTimerRef.current);
     };
   }, [
-      currentUser, products, currentView, handleProductClick, showToast, handleOpenPaymentModal,
-      isAddModalOpen, isEditModalOpen, isHistoryModalOpen, isPaymentModalOpen, 
-      isSummaryModalOpen, isSettingsModalOpen, isCommandPaletteOpen, isSalePanelModalOpen,
-      isPODetailOpen, isAddCustomerModalOpen, isEditCustomerModalOpen, isCustomerSelectModalOpen,
-      isReturnModalOpen, isPostSaleModalOpen, isReceiptModalOpen, isCashManagementModalOpen, 
-      isShiftHistoryModalOpen, isCustomItemModalOpen, isParkedSalesModalOpen, isSmartScannerOpen, isVoiceIngestOpen, isAdminOverrideOpen, isUpgradeModalOpen
+      currentUser, products, currentView, handleProductClick, showToast, handleOpenPaymentModal
   ]);
   
   if (isLoading) {
@@ -660,7 +667,7 @@ const App: React.FC = () => {
       onParkSale={handleParkSale}
       onApplyItemDiscount={applyItemDiscount}
       onApplyGlobalDiscount={applyGlobalDiscount}
-      onApplyPriceOverride={handleRequestPriceOverride} // Protected
+      onApplyPriceOverride={handleRequestPriceOverride}
       onApplyPromotion={applyPromotion}
       onApplyLoyaltyDiscount={applyLoyaltyDiscount}
       onClose={onClose} 
@@ -765,7 +772,7 @@ const App: React.FC = () => {
             <div className="flex flex-1 overflow-hidden">
                 {currentUser.role === 'admin' && currentView === 'catalog' && <FavoritesPanel products={favoriteProducts} onProductClick={handleProductClick} />}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    {currentView === 'catalog' ? (<><div className="mb-4 flex-shrink-0"><div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Buscar producto... (o escanear código)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-12 py-2 rounded-lg border focus:ring-2 bg-dp-light dark:bg-dp-charcoal border-gray-300 dark:border-gray-600 focus:ring-dp-blue dark:focus:ring-dp-gold focus:border-transparent"/><button onClick={() => setIsCommandPaletteOpen(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-500 hover:bg-dp-soft-gray dark:hover:bg-gray-700" title="Búsqueda Rápida (Ctrl+K)" aria-label="Abrir paleta de comandos (Ctrl+K)"><Command size={18} /></button></div><div className="flex flex-wrap items-center gap-2">{categories.map(category => (<button key={category} onClick={() => setSelectedCategory(category)} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${selectedCategory === category ? 'bg-dp-blue text-dp-light dark:bg-dp-gold dark:text-dp-dark' : 'bg-dp-soft-gray text-dp-dark-gray hover:bg-gray-300 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700'}`}>{category === 'all' ? 'Todos' : category}</button>))}</div></div><div className="flex-grow overflow-y-auto pr-1">{<ProductGrid products={filteredProducts} favorites={favorites} userRole={currentUser.role} onToggleFavorite={handleToggleFavorite} onProductClick={handleProductClick} onEditProduct={handleEditProduct} onDeleteProduct={handleDeleteProduct}/>}</div></>)
+                    {currentView === 'catalog' ? (<><div className="mb-4 flex-shrink-0"><div className="relative mb-3"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Buscar producto... (o escanear código)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-12 py-2 rounded-lg border focus:ring-2 bg-dp-light dark:bg-dp-charcoal border-gray-300 dark:border-gray-600 focus:ring-dp-blue focus:ring-dp-gold focus:border-transparent"/><button onClick={() => setIsCommandPaletteOpen(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-500 hover:bg-dp-soft-gray dark:hover:bg-gray-700" title="Búsqueda Rápida (Ctrl+K)" aria-label="Abrir paleta de comandos (Ctrl+K)"><Command size={18} /></button></div><div className="flex flex-wrap items-center gap-2">{categories.map(category => (<button key={category} onClick={() => setSelectedCategory(category)} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${selectedCategory === category ? 'bg-dp-blue text-dp-light dark:bg-dp-gold dark:text-dp-dark' : 'bg-dp-soft-gray text-dp-dark-gray hover:bg-gray-300 dark:bg-dp-charcoal dark:text-dp-light-gray dark:hover:bg-gray-700'}`}>{category === 'all' ? 'Todos' : category}</button>))}</div></div><div className="flex-grow overflow-y-auto pr-1">{<ProductGrid products={filteredProducts} favorites={favorites} userRole={currentUser.role} onToggleFavorite={handleToggleFavorite} onProductClick={handleProductClick} onEditProduct={handleEditProduct} onDeleteProduct={handleDeleteProduct}/>}</div></>)
                     : currentView === 'dashboard' ? <Dashboard onGeneratePO={handleGeneratePO} />
                     : currentView === 'inventory' ? <Inventory products={products} onUpdateStock={handleStockUpdate} />
                     : currentView === 'customers' ? (viewingCustomer ? <CustomerDetail customer={viewingCustomer} onBack={() => setViewingCustomer(null)} onEdit={handleOpenEditCustomerModal} onDelete={handleDeleteCustomer} /> : <Customers customers={customers} onAddCustomer={() => setIsAddCustomerModalOpen(true)} onViewCustomer={setViewingCustomer} />)
@@ -805,7 +812,7 @@ const App: React.FC = () => {
       {isReturnModalOpen && transactionToReturn && <ReturnModal transaction={transactionToReturn} onClose={() => setIsReturnModalOpen(false)} onConfirmRefund={handleConfirmRefund} />}
       {isCashManagementModalOpen && <CashManagementModal onClose={() => setIsCashManagementModalOpen(false)} onSave={handleSaveCashMovement} />}
       {isCustomItemModalOpen && <CustomItemModal onClose={() => setIsCustomItemModalOpen(false)} onSave={handleSaveCustomItem} />}
-      {isParkedSalesModalOpen && <ParkedSalesModal parkedSales={parkedSales} onClose={() => setIsParkedSalesModalOpen(false)} onRestore={handleRestoreSale} onDelete={handleDeleteParkedSale} getTotals={getTotals} />}
+      {isParkedSalesModalOpen && <ParkedSalesModal parkedSales={parkedSales} onClose={() => setIsParkedSalesModalOpen(false)} onRestore={handleRestoreSale} onDelete={handleDeleteParkedSale} />}
       {isSmartScannerOpen && <SmartScannerModal onClose={() => setIsSmartScannerOpen(false)} onProductsUpdated={handleSmartScanSuccess} />}
       {isVoiceIngestOpen && <VoiceIngestModal onClose={() => setIsVoiceIngestOpen(false)} onProductsUpdated={handleSmartScanSuccess} />}
       {currentView === 'catalog' && (
