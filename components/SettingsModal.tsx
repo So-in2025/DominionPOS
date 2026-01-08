@@ -1,11 +1,11 @@
 
-import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { X, Download, Upload, Store, Image as ImageIcon, BrainCircuit, CloudLightning, Signal, Lock, Smartphone, CheckCircle, Crown, Users, UserMinus, ShieldCheck, User as UserIcon, Plus, Info, Database, Loader2, Tags, Edit3, Trash2, Save, Key } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { X, Download, Upload, Store, Image as ImageIcon, CloudLightning, Signal, Users, UserMinus, ShieldCheck, User as UserIcon, Plus, Info, Database, Loader2, Tags, Edit3, Trash2, Save, Crown, CheckCircle } from 'lucide-react';
 import * as dbService from '../services/db';
 import * as settingsService from '../services/settings';
 import * as cloudService from '../services/cloud';
 import * as soundService from '../services/sound';
-import type { LoyaltySettings, User, BusinessSettings, CloudNodeIdentity, PlanTier, Product } from '../types';
+import type { LoyaltySettings, User, BusinessSettings, CloudNodeIdentity, Product } from '../types';
 import AuditLogModal from './AuditLogModal';
 import FeatureGuard from './FeatureGuard';
 import UpgradeModal from './UpgradeModal';
@@ -110,10 +110,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
       reader.readAsText(file);
   };
 
-  // --- USER MANAGEMENT ---
   const handleStartAddUser = () => {
       const currentPlan = cloudService.getPlan();
-      // Ajuste: Plan PRO ahora soporta 3 usuarios
       const maxUsers = currentPlan === 'pro' ? 3 : currentPlan === 'enterprise' ? 6 : 1;
       
       if (users.length >= maxUsers) {
@@ -404,7 +402,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
                     <h3 className="text-lg font-black flex items-center gap-2 text-dp-dark-gray dark:text-dp-light-gray"><Users size={20} className="text-dp-blue dark:text-dp-gold"/> Gestión de Operadores</h3>
                     <p className="text-xs text-gray-500">Control de acceso y roles de caja</p>
                 </div>
-                {/* Ajuste visual: Reflejar límite de 3 usuarios para PRO */}
                 {!isFreeTier && <span className="text-[10px] bg-dp-soft-gray dark:bg-black/40 px-3 py-1 rounded-full font-black text-gray-500 uppercase tracking-tighter">{users.length} / {currentPlan === 'pro' ? '3' : '6'} Cupos</span>}
             </div>
             <div className="space-y-3">
@@ -475,7 +472,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onImportSuccess,
             </div>
           </section>
 
-          <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm"><h3 className="text-lg font-black flex items-center gap-2 text-dp-dark-gray dark:text-dp-light-gray mb-6"><Database size={20} className="text-dp-blue dark:text-dp-gold"/> Mantenimiento de Datos</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><button onClick={handleExport} className="p-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-3 hover:border-dp-blue dark:hover:border-dp-gold hover:bg-gray-50 dark:hover:bg-white/5 transition-all group"><Download size={24} className="text-dp-blue group-hover:scale-110 transition-transform"/><span className="text-xs font-black text-dp-dark-gray dark:text-dp-light-gray uppercase tracking-widest">Exportar Base de Datos</span></button><button onClick={handleImportClick} disabled={isProcessingFile} className="p-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-3 hover:border-red-500 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all group disabled:opacity-50">{isProcessingFile ? <Loader2 className="animate-spin text-red-500" size={24}/> : <Upload size={24} className="text-red-500 group-hover:scale-110 transition-transform"/><span className="text-xs font-black text-dp-dark-gray dark:text-dp-light-gray uppercase tracking-widest">Importar Backup</span></button><input type="file" ref={importInputRef} accept=".json" onChange={handleFileImport} className="hidden" /></div><button onClick={() => setIsAuditModalOpen(true)} className="w-full mt-6 py-3 text-gray-400 text-[10px] uppercase font-black tracking-[0.2em] hover:text-dp-dark-gray dark:hover:text-white transition-all text-center border-t border-gray-100 dark:border-gray-800 pt-6">Ver Registro de Auditoría Local</button></section>
+          <section className="p-6 rounded-2xl bg-white dark:bg-dp-charcoal border border-gray-200 dark:border-gray-700 shadow-sm">
+              <h3 className="text-lg font-black flex items-center gap-2 text-dp-dark-gray dark:text-dp-light-gray mb-6"><Database size={20} className="text-dp-blue dark:text-dp-gold"/> Mantenimiento de Datos</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button onClick={handleExport} className="p-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-3 hover:border-dp-blue dark:hover:border-dp-gold hover:bg-gray-50 dark:hover:bg-white/5 transition-all group">
+                      <Download size={24} className="text-dp-blue group-hover:scale-110 transition-transform"/>
+                      <span className="text-xs font-black text-dp-dark-gray dark:text-dp-light-gray uppercase tracking-widest">Exportar Base de Datos</span>
+                  </button>
+                  <button onClick={handleImportClick} disabled={isProcessingFile} className="p-4 border-2 border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-3 hover:border-red-500 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all group disabled:opacity-50">
+                      {isProcessingFile ? <Loader2 className="animate-spin text-red-500" size={24}/> : <Upload size={24} className="text-red-500 group-hover:scale-110 transition-transform"/>}
+                      <span className="text-xs font-black text-dp-dark-gray dark:text-dp-light-gray uppercase tracking-widest">Importar Backup</span>
+                  </button>
+                  <input type="file" ref={importInputRef} accept=".json" onChange={handleFileImport} className="hidden" />
+              </div>
+              <button onClick={() => setIsAuditModalOpen(true)} className="w-full mt-6 py-3 text-gray-400 text-[10px] uppercase font-black tracking-[0.2em] hover:text-dp-dark-gray dark:hover:text-white transition-all text-center border-t border-gray-100 dark:border-gray-800 pt-6">Ver Registro de Auditoría Local</button>
+          </section>
 
         </div>
 
