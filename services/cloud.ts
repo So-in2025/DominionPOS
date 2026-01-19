@@ -1,4 +1,3 @@
-
 import type { CloudNodeIdentity, PlanTier, FeatureFlag, TelemetryPacket } from '../types';
 import * as dbService from './db';
 
@@ -44,7 +43,6 @@ function _serverDB_save(records: ServerLicenseRecord[]) {
     localStorage.setItem(SERVER_DB_KEY, JSON.stringify(records));
 }
 
-// Nueva lógica de Configuración Global (Simula una tabla de Settings en el servidor)
 export function getGlobalNexusConfig(): GlobalNexusConfig {
     const defaults = { vendorWhatsApp: '5491100000000', systemVersion: '2.5.0', maintenanceMode: false };
     try {
@@ -56,13 +54,34 @@ export function getGlobalNexusConfig(): GlobalNexusConfig {
 export function saveGlobalNexusConfig(config: Partial<GlobalNexusConfig>) {
     const current = getGlobalNexusConfig();
     localStorage.setItem(GLOBAL_CONFIG_KEY, JSON.stringify({ ...current, ...config }));
-    // Disparar evento para que otros componentes en la misma pestaña (simulando otros nodos) se enteren inmediatamente
     window.dispatchEvent(new Event('dominion_global_config_update'));
 }
 
 async function _server_activateLicense(licenseKey: string, nodeId: string): Promise<{ success: boolean; plan?: PlanTier; message: string }> {
     return new Promise(resolve => {
         setTimeout(() => {
+            // --- TRIAL KEY VALIDATION ---
+            if (licenseKey.startsWith('TRIAL-')) {
+                try {
+                    const parts = licenseKey.split('-');
+                    const plan = parts[1] as PlanTier;
+                    const expiryTimestamp = parseInt(parts[2], 10);
+                    
+                    if (Date.now() > expiryTimestamp) {
+                        return resolve({ success: false, message: "Tu prueba PRO ha finalizado." });
+                    }
+
+                    return resolve({ 
+                        success: true, 
+                        plan: plan, 
+                        message: `Prueba ${plan.toUpperCase()} activa.` 
+                    });
+                } catch (e) {
+                    return resolve({ success: false, message: "Clave de prueba inválida." });
+                }
+            }
+
+            // --- STANDARD LICENSE VALIDATION ---
             const db = _serverDB_getAll();
             const license = db.find(l => l.key === licenseKey);
 
@@ -182,6 +201,15 @@ let isNetworkOnline = typeof navigator !== 'undefined' ? navigator.onLine : true
 if (typeof window !== 'undefined') {
     window.addEventListener('online', () => { isNetworkOnline = true; notifyListeners(); connectToNexus(); });
     window.addEventListener('offline', () => { isNetworkOnline = false; notifyListeners(); });
+    window.addEventListener('storage', (e) => {
+        if (e.key === CLIENT_IDENTITY_KEY) {
+            try {
+                const stored = localStorage.getItem(CLIENT_IDENTITY_KEY);
+                if (stored) clientIdentity = JSON.parse(stored);
+                notifyListeners();
+            } catch {}
+        }
+    });
 }
 
 function notifyListeners() {
@@ -208,7 +236,8 @@ export function setPendingSync(count: number) {
     notifyListeners();
 }
 
-export async function connectToNexus(licenseKeyInput?: string): Promise<{ success: boolean; message: string }> {
+// Fix: Update function signature to include optional 'plan' property in return type.
+export async function connectToNexus(licenseKeyInput?: string): Promise<{ success: boolean; message: string; plan?: PlanTier; }> {
     if (!navigator.onLine) return { success: false, message: "Sin conexión a internet." };
     
     const keyToSend = licenseKeyInput ? licenseKeyInput.trim() : clientIdentity.licenseKey;
@@ -224,12 +253,21 @@ export async function connectToNexus(licenseKeyInput?: string): Promise<{ succes
             status: 'active',
             lastSync: Date.now()
         };
-        localStorage.setItem(CLIENT_IDENTITY_KEY, JSON.stringify(clientIdentity));
-        notifyListeners();
-        sendTelemetry();
+    } else if (!response.success && response.message.includes("finalizado")) {
+        // Handle trial expiration: Downgrade to starter
+        clientIdentity = {
+            ...clientIdentity,
+            plan: 'starter',
+            status: 'active'
+        };
     }
+
+    localStorage.setItem(CLIENT_IDENTITY_KEY, JSON.stringify(clientIdentity));
+    notifyListeners();
+    if (response.success) sendTelemetry();
     
-    return { success: response.success, message: response.message };
+    // Fix: Pass the 'plan' property from the server response back to the caller.
+    return { success: response.success, message: response.message, plan: response.plan };
 }
 
 export function generateTelemetryPacket(): TelemetryPacket {
@@ -249,7 +287,7 @@ export function generateTelemetryPacket(): TelemetryPacket {
 }
 
 export async function sendTelemetry() {
-    if (!navigator.onLine || !clientIdentity.licenseKey) return;
+    if (!navigator.onLine || !clientIdentity.licenseKey || clientIdentity.licenseKey.startsWith('TRIAL-')) return;
     const packet = generateTelemetryPacket();
     const db = _serverDB_getAll();
     const record = db.find(l => l.key === clientIdentity.licenseKey);

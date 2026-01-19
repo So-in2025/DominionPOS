@@ -6,7 +6,7 @@ import * as settingsService from '../services/settings';
 import * as soundService from '../services/sound';
 import * as cloudService from '../services/cloud';
 import { BUSINESS_TEMPLATES } from '../services/templates';
-import { LockKeyhole, Delete, ShieldCheck, PlayCircle, Store, Crown, User as UserIcon, Plus, LayoutGrid, Briefcase, MessageCircle, X, CheckCircle, Loader2, HardDrive } from 'lucide-react';
+import { LockKeyhole, Delete, ShieldCheck, PlayCircle, Store, Crown, User as UserIcon, Plus, LayoutGrid, Briefcase, MessageCircle, X, CheckCircle, Loader2, HardDrive, Star } from 'lucide-react';
 import DeveloperPanel from './DeveloperPanel';
 
 interface LoginScreenProps {
@@ -27,22 +27,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     const [settings, setSettings] = useState<BusinessSettings | null>(null);
     const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
     
-    // Security Pattern State
     const [tapSequence, setTapSequence] = useState<string[]>([]);
     
-    // Setup Mode States
     const [storeName, setStoreName] = useState('');
-    const [selectedIndustry, setSelectedIndustry] = useState<BusinessType | ''>('');
-    const [selectedPlan, setSelectedPlan] = useState<PlanTier>('starter');
-    const [validatedLicenseKey, setValidatedLicenseKey] = useState(''); // Stores the key to be saved
+    const [selectedIndustry, setSelectedIndustry] = useState<BusinessType | 'kiosco'>('kiosco');
+    const [selectedPlan, setSelectedPlan] = useState<PlanTier>('pro');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // License Verification State
     const [verifyingPlan, setVerifyingPlan] = useState<PlanTier | null>(null);
     const [licenseInput, setLicenseInput] = useState('');
     const [verificationStatus, setVerificationStatus] = useState<{loading: boolean, error: string, success: boolean}>({ loading: false, error: '', success: false });
 
-    // Add Cashier State
     const [isAddingCashier, setIsAddingCashier] = useState(false);
     const [newCashierName, setNewCashierName] = useState('');
 
@@ -54,12 +49,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         load();
     }, []);
     
-    // Reset sequence if inactive for 5 seconds
     useEffect(() => {
         if (tapSequence.length > 0) {
-            const timer = setTimeout(() => {
-                setTapSequence([]);
-            }, 5000);
+            const timer = setTimeout(() => setTapSequence([]), 5000);
             return () => clearTimeout(timer);
         }
     }, [tapSequence]);
@@ -69,50 +61,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         setSettings(settingsService.getBusinessSettings());
         setSelectedUser(null);
     };
-
-    // --- LICENSE VERIFICATION LOGIC ---
-    const handlePlanClick = (plan: PlanTier) => {
-        setVerifyingPlan(plan);
-        setLicenseInput('');
-        setVerificationStatus({ loading: false, error: '', success: false });
-        soundService.playSound('pop');
-    };
-
-    const handleVerifyLicense = async () => {
-        if (!licenseInput.trim()) {
-            setVerificationStatus({ loading: false, error: 'Ingrese una clave válida.', success: false });
-            soundService.playSound('error');
-            return;
-        }
-
-        setVerificationStatus({ loading: true, error: '', success: false });
-        
-        const result = await cloudService.connectToNexus(licenseInput);
-        
-        if (result.success) {
-            setVerificationStatus({ loading: false, error: '', success: true });
-            soundService.playSound('success');
-            
-            setTimeout(() => {
-                if (verifyingPlan) setSelectedPlan(verifyingPlan);
-                setValidatedLicenseKey(licenseInput);
-                setVerifyingPlan(null);
-            }, 1000);
-        } else {
-            setVerificationStatus({ loading: false, error: 'Licencia inválida o no encontrada.', success: false });
-            soundService.playSound('error');
-        }
-    };
-
+    
     const getWhatsAppLink = () => {
         const vendorNumber = settingsService.getVendorWhatsApp();
-        const planName = verifyingPlan === 'starter' ? 'BASE' : verifyingPlan === 'enterprise' ? 'EMPRESA' : 'PRO';
-        const text = `Hola, necesito un código de activación para el PLAN ${planName} de DOMINION POS.`;
+        const text = `Hola, me interesa adquirir una licencia ${verifyingPlan?.toUpperCase()} para DOMINION POS.`;
         return `https://wa.me/${vendorNumber}?text=${encodeURIComponent(text)}`;
     };
-
-    // --- INITIALIZATION LOGIC ---
-    const handleInitializeSystem = async () => {
+    
+    const handleInitializeSystem = async (keyToUse: string, planToUse: PlanTier) => {
         if (isSubmitting) return;
         
         if(!storeName.trim()) {
@@ -125,19 +81,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             soundService.playSound('error');
             return;
         }
-        if(!validatedLicenseKey) {
-            setError("Debe activar una licencia válida.");
-            soundService.playSound('error');
-            return;
-        }
 
         setIsSubmitting(true);
         try {
             const template = BUSINESS_TEMPLATES[selectedIndustry as keyof typeof BUSINESS_TEMPLATES];
             
-            const currentSettings = settingsService.getBusinessSettings();
             settingsService.saveBusinessSettings({ 
-                ...currentSettings, 
+                ...settingsService.getBusinessSettings(), 
                 storeName: storeName.trim(),
                 customCategories: template ? template.categories : [] 
             });
@@ -149,24 +99,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 settingsService.saveLoyaltySettings(template.loyalty);
             }
 
-            await dbService.addUser({
-                name: 'Admin',
-                pin: '1234',
-                role: 'admin'
-            });
-
-            if (selectedPlan === 'pro' || selectedPlan === 'enterprise') {
-                await dbService.addUser({
-                    name: 'Caja 1',
-                    pin: '', 
-                    role: 'cashier'
-                });
+            await dbService.addUser({ name: 'Admin', pin: '1234', role: 'admin' });
+            if (planToUse === 'pro' || planToUse === 'enterprise') {
+                await dbService.addUser({ name: 'Caja 1', pin: '', role: 'cashier' });
             }
 
             localStorage.setItem('dominion_nexus_identity', JSON.stringify({
                 nodeId: crypto.randomUUID(),
-                licenseKey: validatedLicenseKey, 
-                plan: selectedPlan,
+                licenseKey: keyToUse, 
+                plan: planToUse,
                 status: 'active',
                 lastSync: Date.now()
             }));
@@ -177,34 +118,50 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         } catch (e) {
             console.error(e);
             setError("Error al inicializar.");
+        } finally {
             setIsSubmitting(false);
         }
     };
+    
+    const handleInitializeSystemProTrial = () => {
+        soundService.playSound('hero');
+        const expiryTimestamp = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        const trialKey = `TRIAL-pro-${expiryTimestamp}`;
+        handleInitializeSystem(trialKey, 'pro');
+    };
+    
+    const handleVerifyLicense = async () => {
+        if (!licenseInput.trim() || !verifyingPlan) return;
+        setVerificationStatus({ loading: true, error: '', success: false });
+        const result = await cloudService.connectToNexus(licenseInput);
+        if (result.success && result.plan === verifyingPlan) {
+            setVerificationStatus({ loading: false, error: '', success: true });
+            soundService.playSound('success');
+            setTimeout(() => {
+                handleInitializeSystem(licenseInput, verifyingPlan);
+                setVerifyingPlan(null);
+            }, 1000);
+        } else {
+            setVerificationStatus({ loading: false, error: result.message || 'Licencia inválida.', success: false });
+            soundService.playSound('error');
+        }
+    };
 
-    // --- QUICK ADD CASHIER ---
     const handleQuickAddCashier = async () => {
         if (!newCashierName.trim()) return;
         
-        const storedPlan = localStorage.getItem('dominion_nexus_identity');
-        const planData = storedPlan ? JSON.parse(storedPlan).plan : 'starter';
+        const identity = cloudService.getIdentity();
         const currentUsers = dbService.getUsers();
-        // Ajuste: Plan PRO ahora soporta 3 usuarios
-        const maxUsers = planData === 'pro' ? 3 : planData === 'enterprise' ? 6 : 1;
+        const maxUsers = identity.plan === 'pro' ? 3 : identity.plan === 'enterprise' ? 6 : 1;
 
         if (currentUsers.length >= maxUsers) {
             alert("Límite de usuarios de su plan alcanzado.");
-            setIsAddingCashier(false);
-            setNewCashierName('');
+            setIsAddingCashier(false); setNewCashierName('');
             return;
         }
 
-        await dbService.addUser({
-            name: newCashierName.trim(),
-            pin: '', 
-            role: 'cashier'
-        });
-        setNewCashierName('');
-        setIsAddingCashier(false);
+        await dbService.addUser({ name: newCashierName.trim(), pin: '', role: 'cashier' });
+        setNewCashierName(''); setIsAddingCashier(false);
         handleRefreshData();
         soundService.playSound('success');
     };
@@ -213,18 +170,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         if (pin.length < 6) setPin(pin + value);
     };
 
-    const handleBackspace = () => {
-        setPin(pin.slice(0, -1));
-    };
-    
-    const handleClear = () => {
-        setPin('');
-        setError('');
-    }
+    const handleBackspace = () => setPin(pin.slice(0, -1));
+    const handleClear = () => { setPin(''); setError(''); };
 
     const handleLoginAttempt = useCallback(async () => {
         if (!selectedUser || pin.length === 0) return;
-
         const loggedInUser = await dbService.verifyPin(selectedUser.id, pin);
         if (loggedInUser) {
             onLoginSuccess(loggedInUser);
@@ -236,18 +186,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }, [selectedUser, pin, onLoginSuccess]);
 
     useEffect(() => {
-        if (selectedUser && pin.length > 0 && pin.length === selectedUser.pin.length) {
+        if (selectedUser && pin.length > 0 && selectedUser.pin && pin.length === selectedUser.pin.length) {
             const timer = setTimeout(handleLoginAttempt, 200);
             return () => clearTimeout(timer);
         }
     }, [pin, selectedUser, handleLoginAttempt]);
     
     const switchUser = () => {
-        setSelectedUser(null);
-        setPin('');
-        setError('');
+        setSelectedUser(null); setPin(''); setError('');
         soundService.playSound('pop');
-    }
+    };
 
     const selectUser = (user: User) => {
         if (user.role === 'cashier') {
@@ -257,24 +205,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             setSelectedUser(user);
             soundService.playSound('click');
         }
-    }
+    };
     
     const handleSecretZoneClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const width = rect.width;
-        let zone = '';
-        if (x < width * 0.33) zone = 'left';
-        else if (x > width * 0.66) zone = 'right';
-        else zone = 'center';
-
+        const x = e.clientX - rect.left, width = rect.width;
+        let zone = x < width * 0.33 ? 'left' : x > width * 0.66 ? 'right' : 'center';
         const newSequence = [...tapSequence, zone];
-        let isValidStep = false;
-        if (newSequence.length === 1) isValidStep = zone === 'left';
-        else if (newSequence.length === 2) isValidStep = zone === 'right' && tapSequence[0] === 'left';
-        else if (newSequence.length === 3) isValidStep = zone === 'center' && tapSequence[0] === 'left' && tapSequence[1] === 'right';
+        
+        const pattern = ['left', 'right', 'center'];
+        const isValid = newSequence.every((step, i) => step === pattern[i]);
 
-        if (isValidStep) {
+        if (isValid) {
             setTapSequence(newSequence);
             soundService.playSound('type');
             if (newSequence.length === 3) {
@@ -283,150 +225,79 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 setTapSequence([]);
             }
         } else {
-            if (zone === 'left') { setTapSequence(['left']); soundService.playSound('type'); } 
-            else { setTapSequence([]); }
+            setTapSequence(zone === 'left' ? ['left'] : []);
         }
     };
 
     if (users.length === 0) {
-        const isVerifyingBase = verifyingPlan === 'starter';
         return (
             <div className="dark font-sans relative">
                 {isDevPanelOpen && <DeveloperPanel onClose={() => setIsDevPanelOpen(false)} onRefresh={handleRefreshData} />}
                 
                 {verifyingPlan && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-modal-in backdrop-blur-sm">
-                        <div className={`bg-gray-900 border ${isVerifyingBase ? 'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.2)]' : 'border-dp-gold shadow-[0_0_50px_rgba(212,175,55,0.2)]'} rounded-xl w-full max-w-sm p-6 relative`}>
-                            <button onClick={() => setVerifyingPlan(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
-                                <X size={20} />
-                            </button>
-                            <h3 className={`text-xl font-bold mb-1 flex items-center gap-2 ${isVerifyingBase ? 'text-green-500' : 'text-dp-gold'}`}>
-                                {isVerifyingBase ? <HardDrive size={20}/> : <Crown size={20}/>} 
-                                Activación {verifyingPlan === 'starter' ? 'BASE' : verifyingPlan === 'enterprise' ? 'EMPRESA' : 'PRO'}
-                            </h3>
-                            <p className="text-sm text-gray-400 mb-6">Ingrese su código de acceso único.</p>
-                            
+                        <div className="bg-gray-900 border border-dp-gold rounded-xl w-full max-w-sm p-6 relative shadow-[0_0_50px_rgba(212,175,55,0.2)]">
+                            <button onClick={() => setVerifyingPlan(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"><X size={20} /></button>
+                            <h3 className="text-xl font-bold text-dp-gold mb-1 flex items-center gap-2"><Crown size={20}/> Activación {verifyingPlan.toUpperCase()}</h3>
+                            <p className="text-sm text-gray-400 mb-6">Ingrese su clave de licencia para desbloquear este plan.</p>
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Clave de Licencia</label>
                                     <div className="relative">
-                                        <input 
-                                            autoFocus
-                                            type="text" 
-                                            value={licenseInput}
-                                            onChange={e => setLicenseInput(e.target.value)}
-                                            placeholder="XXXX-XXXX-XXXX"
-                                            className={`w-full bg-black border ${verificationStatus.error ? 'border-red-500' : verificationStatus.success ? 'border-green-500' : 'border-gray-700'} rounded-lg p-3 text-white font-mono text-center uppercase tracking-widest focus:outline-none focus:border-dp-gold transition-colors`}
-                                        />
+                                        <input autoFocus type="text" value={licenseInput} onChange={e => setLicenseInput(e.target.value)} placeholder="XXXX-XXXX-XXXX" className={`w-full bg-black border ${verificationStatus.error ? 'border-red-500' : verificationStatus.success ? 'border-green-500' : 'border-gray-700'} rounded-lg p-3 text-white font-mono text-center uppercase tracking-widest focus:outline-none focus:border-dp-gold transition-colors`} />
                                         {verificationStatus.success && <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={20}/>}
                                     </div>
                                     {verificationStatus.error && <p className="text-red-500 text-xs mt-2 font-bold">{verificationStatus.error}</p>}
                                 </div>
-
-                                <button 
-                                    onClick={handleVerifyLicense}
-                                    disabled={verificationStatus.loading || verificationStatus.success}
-                                    className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${
-                                        verificationStatus.success 
-                                        ? 'bg-green-600 text-white' 
-                                        : isVerifyingBase ? 'bg-green-700 hover:bg-green-600 text-white' : 'bg-dp-gold hover:bg-yellow-500 text-black'
-                                    }`}
-                                >
-                                    {verificationStatus.loading ? <Loader2 className="animate-spin"/> : verificationStatus.success ? 'Validado' : 'Verificar Código'}
-                                </button>
-
-                                <div className="relative flex py-2 items-center">
-                                    <div className="flex-grow border-t border-gray-700"></div>
-                                    <span className="flex-shrink-0 mx-4 text-gray-500 text-xs">O</span>
-                                    <div className="flex-grow border-t border-gray-700"></div>
-                                </div>
-
-                                <a 
-                                    href={getWhatsAppLink()} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="block w-full py-3 rounded-lg font-bold text-center bg-[#25D366] hover:bg-[#20bd5a] text-white transition-all hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 text-sm"
-                                >
-                                    <MessageCircle size={18} fill="white" />
-                                    Solicitar Código (WhatsApp)
-                                </a>
+                                <button onClick={handleVerifyLicense} disabled={verificationStatus.loading || verificationStatus.success} className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${verificationStatus.success ? 'bg-green-600 text-white' : 'bg-dp-gold hover:bg-yellow-500 text-black'}`}>{verificationStatus.loading ? <Loader2 className="animate-spin"/> : verificationStatus.success ? 'Validado' : 'Verificar Licencia'}</button>
+                                <div className="relative flex py-2 items-center"><div className="flex-grow border-t border-gray-700"></div><span className="flex-shrink-0 mx-4 text-gray-500 text-xs">O</span><div className="flex-grow border-t border-gray-700"></div></div>
+                                <a href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer" className="block w-full py-3 rounded-lg font-bold text-center bg-[#25D366] hover:bg-[#20bd5a] text-white transition-all hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 text-sm"><MessageCircle size={18} fill="white" /> Adquirir Licencia (WhatsApp)</a>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-900 text-gray-100 p-4">
-                    <div className="max-w-xl w-full text-center space-y-6 animate-fade-in-out">
-                        <div onClick={handleSecretZoneClick} className="cursor-pointer select-none inline-block p-4 rounded-full bg-dp-gold/10 mb-4 ring-1 ring-dp-gold/50 shadow-[0_0_30px_rgba(212,175,55,0.2)]">
-                            <ShieldCheck size={64} className="text-dp-gold" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-dp-gold mb-2">Bienvenido a Dominion</h1>
-                            <p className="text-gray-400">Configuración Inicial del Sistema</p>
-                        </div>
+                <div className="flex min-h-screen w-full flex-col items-center justify-start sm:justify-center bg-gray-900 text-gray-100 p-4 overflow-y-auto">
+                    <div className="max-w-xl w-full text-center space-y-6 animate-fade-in-out py-8">
+                        <div onClick={handleSecretZoneClick} className="cursor-pointer select-none inline-block p-4 rounded-full bg-dp-gold/10 mb-4 ring-1 ring-dp-gold/50 shadow-[0_0_30px_rgba(212,175,55,0.2)]"><ShieldCheck size={64} className="text-dp-gold" /></div>
+                        <div><h1 className="text-3xl font-bold text-dp-gold mb-2">Bienvenido a Dominion POS</h1><p className="text-gray-400">Configuración Inicial del Sistema</p></div>
                         
-                        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-left space-y-5 shadow-2xl relative overflow-hidden">
+                        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-left space-y-5 shadow-2xl">
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500 flex items-center gap-2"><Store size={14}/> Nombre del Punto</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-dp-gold outline-none transition-all placeholder-gray-600"
-                                    placeholder="Ej: Kiosco Central"
-                                    value={storeName}
-                                    onChange={e => setStoreName(e.target.value)}
-                                />
+                                <input type="text" className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-dp-gold outline-none transition-all placeholder-gray-600" placeholder="Ej: Kiosco Central" value={storeName} onChange={e => setStoreName(e.target.value)} />
                             </div>
-
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500 flex items-center gap-2"><LayoutGrid size={14}/> Rubro / Industria</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {Object.entries(BUSINESS_TEMPLATES).map(([key, template]) => (
-                                        <button 
-                                            key={key}
-                                            onClick={() => setSelectedIndustry(key as BusinessType)}
-                                            className={`p-3 rounded-lg border text-sm text-left transition-all ${selectedIndustry === key ? 'bg-dp-gold text-black border-dp-gold font-bold shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-gray-400'}`}
-                                        >
-                                            {template.name}
-                                        </button>
+                                        <button key={key} onClick={() => setSelectedIndustry(key as BusinessType)} className={`p-3 rounded-lg border text-sm text-left transition-all ${selectedIndustry === key ? 'bg-dp-gold text-black border-dp-gold font-bold shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-gray-400'}`}>{template.name}</button>
                                     ))}
                                 </div>
                             </div>
-
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500 flex items-center gap-2"><Briefcase size={14}/> Tipo de Licencia</label>
-                                <div className="flex gap-2">
-                                    <button onClick={() => handlePlanClick('starter')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'starter' ? 'bg-green-800 border-green-600 text-white ring-2 ring-green-500' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
-                                        BASE<br/><span className="text-[9px] opacity-70 font-normal">1 Usuario</span>
-                                        {selectedPlan !== 'starter' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
-                                    </button>
-                                    <button onClick={() => handlePlanClick('pro')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'pro' ? 'bg-purple-600 border-purple-500 text-white ring-2 ring-purple-400' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
-                                        PRO<br/><span className="text-[9px] opacity-70 font-normal">3 Usuarios</span>
-                                        {selectedPlan !== 'pro' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
-                                    </button>
-                                    <button onClick={() => handlePlanClick('enterprise')} className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all relative overflow-hidden ${selectedPlan === 'enterprise' ? 'bg-yellow-600 border-yellow-500 text-white ring-2 ring-yellow-400' : 'bg-gray-900 border-gray-600 text-gray-500'}`}>
-                                        EMPRESA<br/><span className="text-[9px] opacity-70 font-normal">Multi-Caja</span>
-                                        {selectedPlan !== 'enterprise' && <div className="absolute top-1 right-1"><LockKeyhole size={10}/></div>}
-                                    </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button onClick={() => { setSelectedPlan('starter'); soundService.playSound('click'); }} className={`p-3 rounded-lg border text-center text-sm transition-all ${selectedPlan === 'starter' ? 'bg-green-800 border-green-600 text-white ring-2 ring-green-500' : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-gray-400'}`}><span className="font-bold">BASE</span><br/><span className="text-xs opacity-70">1 Usuario, Local</span></button>
+                                    <button onClick={() => { setSelectedPlan('pro'); soundService.playSound('click'); }} className={`p-3 rounded-lg border text-center text-sm transition-all ${selectedPlan === 'pro' ? 'bg-purple-600 border-purple-500 text-white ring-2 ring-purple-400' : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-gray-400'}`}><span className="font-bold">PRO</span><br/><span className="text-xs opacity-70">3 Usuarios, Nube</span></button>
                                 </div>
                             </div>
-
                             {error && <p className="text-red-400 text-sm font-bold text-center animate-pulse">{error}</p>}
-                            
-                            <button 
-                                onClick={handleInitializeSystem}
-                                disabled={isSubmitting || !validatedLicenseKey}
-                                className="w-full py-4 bg-gradient-to-r from-dp-gold to-yellow-600 hover:to-yellow-500 text-black font-bold rounded-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] shadow-lg mt-2 disabled:opacity-50 disabled:grayscale"
-                            >
-                                <PlayCircle size={20} />
-                                {validatedLicenseKey ? 'Iniciar Sistema' : 'Requiere Licencia'}
-                            </button>
+                            <div className="mt-6 pt-5 border-t border-gray-700 space-y-3">
+                                {selectedPlan === 'starter' && <button onClick={() => setVerifyingPlan('starter')} disabled={isSubmitting} className="w-full py-4 bg-green-700 hover:bg-green-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50">{isSubmitting ? <Loader2 className="animate-spin"/> : <Crown size={20}/>} Activar Licencia Base</button>}
+                                {selectedPlan === 'pro' && <>
+                                    <button onClick={handleInitializeSystemProTrial} disabled={isSubmitting} className="w-full py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] shadow-lg disabled:opacity-50">{isSubmitting ? <Loader2 className="animate-spin"/> : <Star className="animate-pulse"/>} Iniciar Prueba Gratuita (30 Días)</button>
+                                    <button onClick={() => setVerifyingPlan('pro')} className="w-full text-center text-xs text-gray-400 hover:text-white pt-2">o Activar con Licencia PRO</button>
+                                </>}
+                                {selectedPlan === 'enterprise' && <button onClick={() => setVerifyingPlan('enterprise')} className="w-full py-4 bg-dp-gold text-black font-bold rounded-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50">{isSubmitting ? <Loader2 className="animate-spin"/> : <Crown size={20}/>} Activar Licencia Empresa</button>}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         );
     }
-
+    
     if (selectedUser) {
         return (
             <div className="dark font-sans">
@@ -443,7 +314,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         </div>
 
                         <div className="flex justify-center items-center gap-4 mb-8 h-8">
-                            {Array.from({ length: 4 }).map((_, index) => (
+                            {Array.from({ length: selectedUser.pin?.length || 4 }).map((_, index) => (
                                 <div key={index} className={`w-3 h-3 rounded-full transition-all duration-200 ${index < pin.length ? 'bg-dp-gold scale-125 shadow-[0_0_10px_#D4AF37]' : 'bg-gray-700'}`}></div>
                             ))}
                         </div>
@@ -474,85 +345,42 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         );
     }
 
-    const storedPlan = localStorage.getItem('dominion_nexus_identity');
-    const planData = storedPlan ? JSON.parse(storedPlan).plan : 'starter';
-    const canAddCashier = (planData === 'pro' || planData === 'enterprise');
+    const identity = cloudService.getIdentity();
+    const canAddCashier = (identity.plan === 'pro' || identity.plan === 'enterprise');
     const currentUsers = users.length;
-    // Ajuste: Plan PRO ahora soporta 3 usuarios
-    const maxUsersAllowed = planData === 'pro' ? 3 : planData === 'enterprise' ? 6 : 1;
+    const maxUsersAllowed = identity.plan === 'pro' ? 3 : identity.plan === 'enterprise' ? 6 : 1;
 
     return (
         <div className="dark font-sans relative">
             {isDevPanelOpen && <DeveloperPanel onClose={() => setIsDevPanelOpen(false)} onRefresh={handleRefreshData} />}
             <div className="flex h-screen w-full flex-col items-center justify-center bg-dp-dark text-dp-light-gray p-4">
-                <div 
-                    onClick={handleSecretZoneClick}
-                    className="cursor-pointer select-none mb-8 flex flex-col items-center active:scale-95 transition-transform text-center relative w-full max-w-xs mx-auto py-2 rounded-lg hover:bg-white/5"
-                >
-                    {settings?.logoUrl ? (
-                        <>
-                            <img src={settings.logoUrl} alt="Logo" className="h-24 max-w-[80%] object-contain mb-4 drop-shadow-lg pointer-events-none" />
-                            <h1 className="text-xl font-bold tracking-tight text-dp-gold uppercase pointer-events-none">{settings.storeName}</h1>
-                        </>
-                    ) : (
-                        <h1 className="text-4xl font-black tracking-tight text-dp-gold mb-2 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)] pointer-events-none">DOMINION POS</h1>
-                    )}
+                <div onClick={handleSecretZoneClick} className="cursor-pointer select-none mb-8 flex flex-col items-center active:scale-95 transition-transform text-center relative w-full max-w-xs mx-auto py-2 rounded-lg hover:bg-white/5">
+                    {settings?.logoUrl ? (<><img src={settings.logoUrl} alt="Logo" className="h-24 max-w-[80%] object-contain mb-4 drop-shadow-lg pointer-events-none" /><h1 className="text-xl font-bold tracking-tight text-dp-gold uppercase pointer-events-none">{settings.storeName}</h1></>) : (<h1 className="text-4xl font-black tracking-tight text-dp-gold mb-2 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)] pointer-events-none">DOMINION</h1>)}
                 </div>
-                
                 <div className="w-full max-w-4xl">
                     <p className="text-center text-gray-500 mb-6 uppercase tracking-widest text-xs font-bold">Seleccione Usuario</p>
                     <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
                         {users.map(user => {
                             const isAdmin = user.role === 'admin';
-                            return (
-                                <button 
-                                    key={user.id} 
-                                    onClick={() => selectUser(user)} 
-                                    className={`group flex flex-col items-center justify-center gap-3 p-6 rounded-xl border transition-all hover:-translate-y-1 shadow-lg relative overflow-hidden h-40 w-36 sm:w-48
-                                        ${isAdmin 
-                                            ? 'bg-gradient-to-b from-gray-800 to-gray-900 border-yellow-900/30 hover:border-dp-gold/50' 
-                                            : 'bg-dp-charcoal border-gray-800 hover:border-gray-600'
-                                        }`}
-                                >
-                                    <div className={`p-4 rounded-full transition-colors ${isAdmin ? 'bg-yellow-900/20 group-hover:bg-dp-gold/20' : 'bg-black/50 group-hover:bg-white/10'}`}>
-                                        {isAdmin ? (
-                                            <LockKeyhole size={32} className={`transition-colors ${isAdmin ? 'text-yellow-600 group-hover:text-dp-gold' : 'text-gray-400'}`}/>
-                                        ) : (
-                                            <UserIcon size={32} className="text-gray-400 group-hover:text-white"/>
-                                        )}
-                                    </div>
-                                    <div className="text-center relative z-10 w-full">
-                                        <span className={`block font-bold text-lg truncate transition-colors ${isAdmin ? 'text-yellow-100 group-hover:text-dp-gold' : 'text-gray-300 group-hover:text-white'}`}>
-                                            {user.name}
-                                        </span>
-                                    </div>
-                                </button>
-                            );
+                            return (<button key={user.id} onClick={() => selectUser(user)} className={`group flex flex-col items-center justify-center gap-3 p-6 rounded-xl border transition-all hover:-translate-y-1 shadow-lg relative overflow-hidden h-40 w-36 sm:w-48 ${isAdmin ? 'bg-gradient-to-b from-gray-800 to-gray-900 border-yellow-900/30 hover:border-dp-gold/50' : 'bg-dp-charcoal border-gray-800 hover:border-gray-600'}`}>
+                                <div className={`p-4 rounded-full transition-colors ${isAdmin ? 'bg-yellow-900/20 group-hover:bg-dp-gold/20' : 'bg-black/50 group-hover:bg-white/10'}`}>
+                                    {isAdmin ? <LockKeyhole size={32} className={`transition-colors ${isAdmin ? 'text-yellow-600 group-hover:text-dp-gold' : 'text-gray-400'}`}/> : <UserIcon size={32} className="text-gray-400 group-hover:text-white"/>}
+                                </div>
+                                <div className="text-center relative z-10 w-full"><span className={`block font-bold text-lg truncate transition-colors ${isAdmin ? 'text-yellow-100 group-hover:text-dp-gold' : 'text-gray-300 group-hover:text-white'}`}>{user.name}</span></div>
+                            </button>);
                         })}
-
                         {canAddCashier && currentUsers < maxUsersAllowed && (
                             <div className="relative h-40 w-36 sm:w-48">
                                 {isAddingCashier ? (
                                     <div className="absolute inset-0 bg-gray-800 border border-gray-600 rounded-xl p-4 flex flex-col justify-center gap-2 animate-modal-in">
-                                        <input 
-                                            autoFocus
-                                            type="text" 
-                                            placeholder="Nombre Caja" 
-                                            value={newCashierName}
-                                            onChange={e => setNewCashierName(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleQuickAddCashier()}
-                                            className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-green-500 outline-none"
-                                        />
+                                        <input autoFocus type="text" placeholder="Nombre Caja" value={newCashierName} onChange={e => setNewCashierName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleQuickAddCashier()} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-green-500 outline-none" />
                                         <div className="flex gap-2">
                                             <button onClick={() => setIsAddingCashier(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-xs py-2 rounded text-gray-300">Cancelar</button>
                                             <button onClick={handleQuickAddCashier} className="flex-1 bg-green-700 hover:bg-green-600 text-xs py-2 rounded text-white font-bold">Crear</button>
                                         </div>
                                     </div>
                                 ) : (
-                                    <button 
-                                        onClick={() => setIsAddingCashier(true)}
-                                        className="w-full h-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-700 hover:border-gray-500 hover:bg-white/5 transition-all text-gray-500 hover:text-gray-300"
-                                    >
+                                    <button onClick={() => setIsAddingCashier(true)} className="w-full h-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-700 hover:border-gray-500 hover:bg-white/5 transition-all text-gray-500 hover:text-gray-300">
                                         <Plus size={32} />
                                         <span className="text-xs font-bold uppercase">Nueva Caja</span>
                                         <span className="text-[10px] opacity-50">({currentUsers}/{maxUsersAllowed})</span>

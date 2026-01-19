@@ -32,7 +32,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
 
   return (
     <div
-      className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 pl-4 pr-2 py-2 rounded-lg shadow-lg animate-fade-in-out ${toastStyles[type].bg}`}
+      className={`fixed top-20 right-6 z-50 flex items-center gap-3 pl-4 pr-2 py-2 rounded-lg shadow-lg animate-slide-in-from-right ${toastStyles[type].bg}`}
       role="alert"
       aria-live="assertive"
     >

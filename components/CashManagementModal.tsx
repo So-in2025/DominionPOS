@@ -52,7 +52,7 @@ const CashManagementModal: React.FC<CashManagementModalProps> = ({ onClose, onSa
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[60] flex justify-center items-center backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-dp-dark rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-modal-in flex flex-col md:flex-row border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-dp-dark rounded-2xl shadow-2xl w-full max-w-4xl animate-modal-in flex flex-col md:flex-row border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto md:overflow-hidden custom-scrollbar" onClick={e => e.stopPropagation()}>
         
         {/* Left: Input Section */}
         <div className="md:w-1/2 p-8 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800">

@@ -1,5 +1,5 @@
 import React, { ErrorInfo, ReactNode } from 'react';
-import { AlertOctagon, RefreshCw, DatabaseBackup } from 'lucide-react';
+import { AlertOctagon, RefreshCw } from 'lucide-react';
 
 interface Props {
   children?: ReactNode;
@@ -15,10 +15,17 @@ interface State {
  * logs those errors, and displays a fallback UI instead of the component tree that crashed.
  */
 class ErrorBoundary extends React.Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null
-  };
+  // Fix: Explicitly declare the state property on the class. This resolves errors where `this.state` might
+  // not be recognized in certain build configurations, even when initialized in the constructor.
+  public state: State;
+
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -28,7 +35,7 @@ class ErrorBoundary extends React.Component<Props, State> {
     console.error("Critical System Crash:", error, errorInfo);
   }
 
-  private handleReset = () => {
+  handleReset = () => {
     window.location.reload();
   };
 
@@ -42,36 +49,26 @@ class ErrorBoundary extends React.Component<Props, State> {
             </div>
             <h1 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">Fallo Crítico de Núcleo</h1>
             <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-              El motor de renderizado encontró una inconsistencia. Sus datos locales en IndexedDB están a salvo, pero la interfaz debe reiniciarse.
+              El motor de renderizado encontró una inconsistencia. Sus datos locales están a salvo, pero la interfaz debe reiniciarse.
             </p>
             
-            <div className="bg-black/40 rounded-xl p-4 mb-8 text-left border border-gray-800">
-                <p className="text-[10px] font-black text-gray-500 uppercase mb-2 tracking-widest">Traza del Error</p>
-                <code className="text-[11px] text-red-400 font-mono break-words line-clamp-3">
-                    {this.state.error?.message || "Error desconocido en el hilo principal"}
-                </code>
+            <div className="bg-black/40 rounded-xl p-4 mb-8 text-left text-xs font-mono text-red-300 overflow-auto max-h-24 custom-scrollbar">
+              <p className="font-bold text-red-400">Error: {this.state.error?.name}</p>
+              <p>{this.state.error?.message}</p>
             </div>
-
-            <div className="space-y-3">
-                <button 
-                    onClick={this.handleReset}
-                    className="w-full py-4 bg-white text-black font-black uppercase text-xs tracking-[0.2em] rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
-                >
-                    <RefreshCw size={16} /> Reiniciar Interfaz
-                </button>
-                <button 
-                    onClick={() => { localStorage.clear(); window.location.reload(); }}
-                    className="w-full py-3 text-gray-500 text-[10px] font-black uppercase hover:text-white transition-colors flex items-center justify-center gap-2"
-                >
-                    <DatabaseBackup size={14} /> Purgar Caché de Sesión (Seguro)
-                </button>
+            
+            <div className="flex gap-4">
+              <button onClick={this.handleReset} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-all">
+                <RefreshCw size={16} /> Reiniciar App
+              </button>
             </div>
           </div>
         </div>
       );
     }
 
-    return this.props.children || null;
+    // Fix: In React class components, props are accessed via `this.props`.
+    return this.props.children;
   }
 }
 

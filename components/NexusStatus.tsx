@@ -1,26 +1,68 @@
 
 import React, { useState, useEffect } from 'react';
-import { Cloud, CloudOff, Wifi, WifiOff, Crown, ShieldCheck, RefreshCw, HardDrive } from 'lucide-react';
+import { Cloud, CloudOff, Wifi, WifiOff, Crown, ShieldCheck, RefreshCw, HardDrive, Clock } from 'lucide-react';
 import * as cloudService from '../services/cloud';
-import type { PlanTier } from '../types';
+import type { PlanTier, CloudNodeIdentity } from '../types';
 import UpgradeModal from './UpgradeModal';
 
 const NexusStatus: React.FC = () => {
   const [isConnected, setIsConnected] = useState(navigator.onLine);
-  const [plan, setPlan] = useState<PlanTier>('starter');
   const [pendingSync, setPendingSync] = useState(0);
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
+  
+  const [identity, setIdentity] = useState<CloudNodeIdentity>(cloudService.getIdentity());
 
   useEffect(() => {
-    const unsubscribe = cloudService.subscribeToNexusStatus((online, currentPlan, pending) => {
+    const unsubscribe = cloudService.subscribeToNexusStatus((online, _currentPlan, pending) => {
         setIsConnected(online);
-        setPlan(currentPlan);
         setPendingSync(pending);
+        
+        const currentIdentity = cloudService.getIdentity();
+        setIdentity(currentIdentity); // Update local identity state as single source of truth
+
+        if (currentIdentity.licenseKey.startsWith('TRIAL-')) {
+            try {
+                const expiryTimestamp = parseInt(currentIdentity.licenseKey.split('-')[2], 10);
+                const days = Math.ceil((expiryTimestamp - Date.now()) / (1000 * 60 * 60 * 24));
+                setTrialDaysLeft(Math.max(0, days));
+            } catch {
+                setTrialDaysLeft(0);
+            }
+        } else {
+            setTrialDaysLeft(null);
+        }
     });
     return unsubscribe;
   }, []);
 
-  // --- FREE PLAN: SIMPLIFIED LOCAL MODE ---
+  const isTrial = identity.licenseKey.startsWith('TRIAL-');
+  const plan = identity.plan;
+
+  // --- RENDER LOGIC ---
+
+  // 1. Prioritize Trial Display
+  if (isTrial) {
+      const isEndingSoon = trialDaysLeft !== null && trialDaysLeft <= 7;
+      return (
+        <>
+          <button 
+              onClick={() => setIsUpgradeOpen(true)}
+              className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-widest transition-all ${
+                  isEndingSoon 
+                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 border-orange-200 dark:border-orange-800 animate-pulse'
+                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+              }`}
+          >
+              <Clock size={12} />
+              PRUEBA PRO: {trialDaysLeft !== null ? `${trialDaysLeft} DÍAS` : '...'}
+          </button>
+          {isUpgradeOpen && <UpgradeModal onClose={() => setIsUpgradeOpen(false)} />}
+        </>
+      );
+  }
+
+  // 2. Display Starter Plan
   if (plan === 'starter') {
       return (
         <>
@@ -29,14 +71,14 @@ const NexusStatus: React.FC = () => {
                 className="flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 uppercase tracking-widest transition-all hover:bg-green-200 dark:hover:bg-green-900/50"
             >
                 <HardDrive size={12} />
-                <span className="hidden sm:inline">MODO LOCAL</span>
+                <span className="hidden sm:inline">PLAN BASE</span>
             </button>
             {isUpgradeOpen && <UpgradeModal onClose={() => setIsUpgradeOpen(false)} />}
         </>
       );
   }
 
-  // --- PRO/ENTERPRISE: FULL CLOUD STATUS ---
+  // 3. Display Full Pro/Enterprise Status for paid licenses.
   const getPlanIcon = () => {
       switch (plan) {
           case 'enterprise': return <Crown size={12} className="text-purple-200" />;

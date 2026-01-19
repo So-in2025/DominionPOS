@@ -44,7 +44,7 @@ import * as settingsService from './services/settings';
 import * as cloudService from './services/cloud';
 import * as soundService from './services/sound';
 import * as ttsService from './services/tts';
-import { PlusCircle, History, Search, BookCheck, Settings, Command, LayoutDashboard, List, Package, Truck, Users, DollarSign, Archive, ParkingSquare, LogOut, Crown, LayoutGrid, Sparkles, PauseCircle } from 'lucide-react';
+import { PlusCircle, History, Search, BookCheck, Settings, Command, LayoutDashboard, List, Package, Truck, Users, DollarSign, Archive, ParkingSquare, LogOut, Crown, LayoutGrid, Sparkles, PauseCircle, ShieldAlert } from 'lucide-react';
 
 const App: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
@@ -67,6 +67,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>(settingsService.getBusinessSettings());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [trialHasEnded, setTrialHasEnded] = useState(false);
   
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -137,8 +138,11 @@ const App: React.FC = () => {
       });
       
       cloudService.connectToNexus().then(res => {
-          if(res.success && res.message.includes("PRO")) {
+          if (res.success && !res.message.includes("Prueba")) {
               showToast(res.message, "success");
+          }
+          if (!res.success && res.message.includes("finalizado")) {
+              setTrialHasEnded(true);
           }
       });
 
@@ -764,6 +768,17 @@ const App: React.FC = () => {
   return (
     <div className={`${theme} font-sans`}>
       <div className="flex h-screen flex-col bg-dp-soft-gray dark:bg-dp-dark text-dp-dark-gray dark:text-dp-light-gray">
+        {/* TRIAL ENDED BANNER */}
+        {trialHasEnded && (
+            <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white p-2 text-center text-sm font-bold flex items-center justify-center gap-4 animate-fade-in-out">
+                <ShieldAlert size={20}/>
+                <span>Tu prueba PRO ha finalizado. Has vuelto al plan Básico.</span>
+                <button onClick={() => setIsUpgradeModalOpen(true)} className="px-3 py-1 bg-white text-red-600 rounded-full text-xs font-black uppercase hover:bg-gray-200">
+                    Activar PRO
+                </button>
+            </div>
+        )}
+
         {/* Header */}
         <header className="flex flex-col border-b border-dp-soft-gray-dark/10 bg-dp-light dark:bg-dp-dark shadow-md flex-shrink-0 z-10">
             <div className="flex h-16 w-full items-center justify-between px-6">
@@ -776,7 +791,7 @@ const App: React.FC = () => {
                     <NexusStatus />
                 </div>
                 <div className="flex items-center gap-4">
-                    {isFreeTier && (
+                    {isFreeTier && !trialHasEnded && (
                         <button 
                             onClick={() => setIsUpgradeModalOpen(true)}
                             className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold text-xs shadow-lg animate-pulse hover:animate-none hover:scale-105 transition-transform"

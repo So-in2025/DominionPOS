@@ -64,7 +64,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ product, onClose, o
       role="dialog"
       onClick={onClose}
     >
-      <div className="bg-dp-light dark:bg-dp-charcoal rounded-lg shadow-2xl p-6 w-full max-w-md m-4 animate-modal-in" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-dp-light dark:bg-dp-charcoal rounded-lg shadow-2xl p-6 w-full max-w-md m-4 animate-modal-in max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl font-bold mb-4 text-dp-dark-gray dark:text-dp-light-gray">Editar Producto</h2>
         
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}

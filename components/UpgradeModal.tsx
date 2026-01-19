@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, CheckCircle, Crown, MessageCircle, Star, ShieldCheck, Zap, Server, Smartphone } from 'lucide-react';
+import { X, CheckCircle, Crown, MessageCircle, Gem, Brain } from 'lucide-react';
 import * as cloudService from '../services/cloud';
 import * as settingsService from '../services/settings';
 
@@ -8,136 +8,169 @@ interface UpgradeModalProps {
   onClose: () => void;
 }
 
+const PlanButton = ({ label, price, freq, isSelected, onClick, color }: { label:string, price:number, freq:string, isSelected:boolean, onClick:()=>void, color:'blue'|'gold' }) => {
+    const selectedClasses = color === 'blue' 
+        ? 'bg-blue-600 border-blue-400 text-white' 
+        : 'bg-dp-gold border-yellow-300 text-black';
+    const idleClasses = 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500';
+
+    return (
+        <button
+            onClick={onClick}
+            className={`w-full p-3 rounded-lg border-2 transition-all flex justify-between items-center ${isSelected ? selectedClasses : idleClasses}`}
+        >
+            <div className="flex items-center gap-3">
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-current bg-current' : 'border-gray-500'}`}>
+                    {isSelected && <CheckCircle size={12} className={color==='gold' ? "text-black" : "text-white"}/>}
+                </div>
+                <span className="font-bold text-sm">{label}</span>
+            </div>
+            <div className="text-right">
+                <span className="font-black text-lg">${price.toLocaleString('es-AR')}</span>
+                <span className={`text-xs ${isSelected ? (color==='gold' ? 'text-black/70' : 'text-white/70') : 'text-gray-500'}`}>{freq}</span>
+            </div>
+        </button>
+    )
+}
+
 const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
   const identity = cloudService.getIdentity();
-  const [selectedInterest, setSelectedInterest] = useState<'prepago' | 'abono' | 'anual'>('abono');
+  const [tier, setTier] = useState<'inteligente' | 'premium'>('premium');
+  const [frequency, setFrequency] = useState<'mensual' | 'anual'>('mensual');
   
   const vendorNumber = settingsService.getVendorWhatsApp();
   
   const getMessage = () => {
-      let planText = "ABONO PRO";
-      if (selectedInterest === 'prepago') planText = "PLAN BASE";
-      if (selectedInterest === 'anual') planText = "PRO ANUAL";
+      const tierText = tier === 'premium' ? "PREMIUM" : "INTELIGENTE";
+      const freqText = frequency === 'anual' ? "ANUAL" : "MENSUAL";
+      let planText = `PRO ${tierText} ${freqText}`;
       
-      return `Hola! Estoy interesado en el ${planText} para DOMINION POS.\n\nMi ID de Soporte es: *${identity.licenseKey}*\n\n(Enviado desde la App)`;
+      return `Hola! Estoy interesado en el plan ${planText} para DOMINION POS.\n\nMi ID de Soporte es: *${identity.licenseKey}*\n\n(Enviado desde la App)`;
   };
   
   const whatsappUrl = `https://wa.me/${vendorNumber}?text=${encodeURIComponent(getMessage())}`;
 
+  const prices = {
+      inteligente: {
+          mensual: 7499,
+          anual: 59999,
+      },
+      premium: {
+          mensual: 10499,
+          anual: 79999,
+      }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/80 z-[60] flex justify-center items-center backdrop-blur-sm p-4 animate-modal-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/80 z-[100] flex justify-center items-center backdrop-blur-sm p-4 animate-modal-in" onClick={onClose}>
       <div 
-        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl border border-dp-gold/30 flex flex-col md:flex-row max-h-[90vh] overflow-y-auto md:overflow-hidden" 
+        className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl border border-dp-gold/30 flex flex-col max-h-[90vh] overflow-hidden" 
         onClick={e => e.stopPropagation()}
       >
-        
-        {/* Left Side: Pitch */}
-        <div className="w-full md:w-1/3 bg-gradient-to-br from-gray-900 to-black p-6 text-white relative overflow-hidden flex flex-col flex-shrink-0">
-            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-            <div className="relative z-10">
-                <div className="inline-flex p-3 rounded-full bg-dp-gold/20 mb-4 ring-1 ring-dp-gold/50 shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-                    <Crown size={32} className="text-dp-gold" />
+        <div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
+            <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-dp-gold/10 ring-1 ring-dp-gold/30">
+                    <Crown size={24} className="text-dp-gold" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Elegí tu Plan</h2>
-                <p className="text-gray-400 text-sm mb-6">Potencia tu comercio con la tecnología de Dominion.</p>
-                
-                <div className="space-y-4">
-                    <div className="flex gap-3 items-start">
-                        <Smartphone size={20} className="text-green-400 mt-1"/>
-                        <div>
-                            <h4 className="font-bold text-sm">Plan Base (Único)</h4>
-                            <p className="text-xs text-gray-400">1 Caja, Local, Sin vencimiento. Ideal para empezar.</p>
-                        </div>
-                    </div>
-                    <div className="flex gap-3 items-start">
-                        <Server size={20} className="text-blue-400 mt-1"/>
-                        <div>
-                            <h4 className="font-bold text-sm">Abono PRO (Mensual)</h4>
-                            <p className="text-xs text-gray-400">Multi-Caja, Backup Nube, Soporte. El más elegido.</p>
-                        </div>
-                    </div>
+                <div>
+                    <h2 className="text-xl font-bold text-white">Evoluciona tu Comercio</h2>
+                    <p className="text-xs text-gray-400">Desbloquea el potencial completo de Dominion POS.</p>
                 </div>
             </div>
-            
-            <div className="mt-6 md:mt-auto relative z-10 pt-6 border-t border-gray-800">
-                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Tu ID de Nodo</p>
-                <p className="font-mono text-sm text-dp-gold">{identity.licenseKey || 'Sin licencia'}</p>
+            <button onClick={onClose} className="p-2 text-gray-500 hover:text-white rounded-full transition-colors"><X size={24} /></button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="grid md:grid-cols-2 gap-px bg-gray-800">
+                {/* PRO INTELIGENTE */}
+                <div className="bg-gray-900 p-6 flex flex-col">
+                    <div className="flex items-center gap-3 mb-3">
+                        <Brain size={24} className="text-blue-400"/>
+                        <h3 className="text-lg font-bold text-white">PRO Inteligente</h3>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-4 font-medium flex-grow">
+                        Ideal para quienes buscan el <strong className="text-white">máximo ahorro</strong>. Este plan te da acceso a todas las funciones PRO. Para potenciar la IA, usarás la cuota gratuita que Google ofrece a todos sus usuarios.
+                        <br/><br/>
+                        <strong className="text-gray-300">¿Qué implica?</strong> Una configuración simple de única vez donde vinculas tu cuenta. ¡Te guiamos en el proceso!
+                    </p>
+                    <div className="mt-4 space-y-2">
+                        <PlanButton 
+                            label="Mensual" 
+                            price={prices.inteligente.mensual} 
+                            freq="/mes" 
+                            isSelected={tier === 'inteligente' && frequency === 'mensual'} 
+                            onClick={() => { setTier('inteligente'); setFrequency('mensual'); }}
+                            color="blue"
+                        />
+                        <PlanButton 
+                            label="Anual" 
+                            price={prices.inteligente.anual} 
+                            freq="/año"
+                            isSelected={tier === 'inteligente' && frequency === 'anual'} 
+                            onClick={() => { setTier('inteligente'); setFrequency('anual'); }}
+                            color="blue"
+                        />
+                    </div>
+                    <ul className="text-xs text-gray-400 mt-4 space-y-1.5 pt-4 border-t border-gray-800">
+                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500 mt-0.5"/> Precio más bajo garantizado.</li>
+                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500 mt-0.5"/> Todas las funciones PRO: Multi-caja, Nube, etc.</li>
+                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500 mt-0.5"/> Control total sobre tu consumo de IA.</li>
+                    </ul>
+                </div>
+                
+                {/* PRO PREMIUM */}
+                <div className="bg-gradient-to-br from-gray-900 to-black p-6 flex flex-col border-l-4 border-dp-gold">
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-3">
+                            <Gem size={24} className="text-dp-gold"/>
+                            <h3 className="text-lg font-bold text-white">PRO Premium</h3>
+                        </div>
+                        <span className="bg-dp-gold text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Recomendado</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-4 font-medium flex-grow">
+                        La experiencia definitiva: <strong className="text-white">máxima comodidad</strong>. Olvídate de configuraciones. Nosotros nos encargamos de toda la infraestructura de IA para que tu sistema simplemente funcione, siempre.
+                        <br/><br/>
+                        <strong className="text-gray-300">¿Qué implica?</strong> Absolutamente nada para ti. Disfruta de todo desde el primer segundo, sin pasos adicionales.
+                    </p>
+                    <div className="mt-4 space-y-2">
+                        <PlanButton 
+                            label="Mensual" 
+                            price={prices.premium.mensual} 
+                            freq="/mes" 
+                            isSelected={tier === 'premium' && frequency === 'mensual'} 
+                            onClick={() => { setTier('premium'); setFrequency('mensual'); }}
+                            color="gold"
+                        />
+                        <PlanButton 
+                            label="Anual" 
+                            price={prices.premium.anual} 
+                            freq="/año" 
+                            isSelected={tier === 'premium' && frequency === 'anual'} 
+                            onClick={() => { setTier('premium'); setFrequency('anual'); }}
+                            color="gold"
+                        />
+                    </div>
+                    <ul className="text-xs text-gray-400 mt-4 space-y-1.5 pt-4 border-t border-gray-800">
+                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500 mt-0.5"/> Cero configuración técnica.</li>
+                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500 mt-0.5"/> Todas las funciones PRO, listas para usar.</li>
+                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500 mt-0.5"/> Garantía de servicio y disponibilidad.</li>
+                    </ul>
+                </div>
             </div>
         </div>
 
-        {/* Right Side: Pricing Tables */}
-        <div className="w-full md:w-2/3 p-6 bg-gray-50 dark:bg-gray-900 md:overflow-y-auto">
-            <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-black dark:hover:text-white transition-colors z-10 bg-white/20 rounded-full p-1 md:bg-transparent">
-                <X size={24} />
-            </button>
-
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Selecciona una opción:</h3>
-
-            <div className="grid gap-4">
-                {/* PREPAGO */}
-                <div 
-                    onClick={() => setSelectedInterest('prepago')}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedInterest === 'prepago' ? 'border-green-500 bg-green-50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 hover:border-green-300'}`}
-                >
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="font-bold text-green-700 dark:text-green-400 flex items-center gap-2"><Smartphone size={18}/> PLAN BASE</span>
-                        <span className="text-xl font-black text-gray-900 dark:text-white">$14.999</span>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Pago único de por vida. Funciona sin internet.</p>
-                    <ul className="text-sm space-y-1">
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500"/> 1 Caja (Dispositivo único)</li>
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500"/> Inventario + Ventas</li>
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-green-500"/> Sin vencimiento</li>
-                    </ul>
-                </div>
-
-                {/* ABONO PRO */}
-                <div 
-                    onClick={() => setSelectedInterest('abono')}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all relative ${selectedInterest === 'abono' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10 shadow-lg' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}
-                >
-                    <div className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide shadow-md">Recomendado ⭐</div>
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="font-bold text-blue-700 dark:text-blue-400 flex items-center gap-2"><Server size={18}/> ABONO PRO</span>
-                        <div className="text-right">
-                            <span className="text-xs line-through text-gray-400 block">$6.999 inicio</span>
-                            <span className="text-xl font-black text-gray-900 dark:text-white">$7.499<span className="text-xs font-normal text-gray-500">/mes</span></span>
-                        </div>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Entrá barato y tené todo. Potencia total.</p>
-                    <ul className="text-sm space-y-1">
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-blue-500"/> <strong>3 Usuarios</strong> (Dueño + 2 Operadores)</li>
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-blue-500"/> <strong>Backup Automático en Nube</strong></li>
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-blue-500"/> Reportes Avanzados + Soporte</li>
-                    </ul>
-                </div>
-
-                {/* ANUAL */}
-                <div 
-                    onClick={() => setSelectedInterest('anual')}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedInterest === 'anual' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10' : 'border-gray-200 dark:border-gray-700 hover:border-yellow-300'}`}
-                >
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="font-bold text-yellow-700 dark:text-yellow-400 flex items-center gap-2"><Crown size={18}/> PRO ANUAL</span>
-                        <span className="text-xl font-black text-gray-900 dark:text-white">$79.999<span className="text-xs font-normal text-gray-500">/año</span></span>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Mejor precio. Pagá menos y olvidate.</p>
-                    <ul className="text-sm space-y-1">
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-yellow-500"/> Todo lo del Plan PRO</li>
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-yellow-500"/> Descuento vs Mensual</li>
-                        <li className="flex gap-2"><CheckCircle size={14} className="text-yellow-500"/> Sin pagos mensuales</li>
-                    </ul>
-                </div>
-            </div>
-
+        <div className="p-4 bg-gray-900/50 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-gray-500">
+                Tu ID de Soporte: <strong className="font-mono text-gray-400">{identity.licenseKey || 'Sin licencia'}</strong>
+            </p>
             <a 
                 href={whatsappUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="mt-6 flex items-center justify-center gap-3 w-full py-4 rounded-xl font-bold text-white bg-[#25D366] hover:bg-[#20bd5a] transition-all shadow-lg hover:shadow-green-500/30 hover:-translate-y-0.5 active:translate-y-0 mb-4 md:mb-0"
+                className="w-full sm:w-auto flex items-center justify-center gap-3 px-6 py-3 rounded-xl font-bold text-white bg-[#25D366] hover:bg-[#20bd5a] transition-all shadow-lg hover:shadow-green-500/30 hover:-translate-y-0.5 active:translate-y-0 text-sm"
             >
-                <MessageCircle size={24} fill="white" className="text-white" />
-                Solicitar {selectedInterest === 'prepago' ? 'Plan Base' : selectedInterest === 'abono' ? 'Abono Pro' : 'Plan Anual'}
+                <MessageCircle size={20} fill="white" className="text-white" />
+                Solicitar Plan {tier.charAt(0).toUpperCase() + tier.slice(1)} {frequency.charAt(0).toUpperCase() + frequency.slice(1)}
             </a>
         </div>
       </div>
